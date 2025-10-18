@@ -1,28 +1,43 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useAuth } from '@/contexts/UnifiedAuthContext'
+import LoginForm from '@/components/LoginForm'
+import SignUpForm from '@/components/SignUpForm'
+import ConfirmSignUpForm from '@/components/ConfirmSignUpForm'
+
+type AuthView = 'login' | 'signup' | 'confirm' | 'forgot'
 
 export default function Home() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [loginForm, setLoginForm] = useState({
-    email: '',
-    password: ''
-  })
+  const [authView, setAuthView] = useState<AuthView>('login')
+  const [confirmEmail, setConfirmEmail] = useState('')
+  const { user, loading, signOut } = useAuth()
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Simple validation - in a real app, this would connect to a backend
-    if (loginForm.email && loginForm.password) {
-      setIsLoggedIn(true)
+  const handleLogout = async () => {
+    try {
+      await signOut()
+    } catch (error) {
+      console.error('Logout error:', error)
     }
   }
 
-  const handleLogout = () => {
-    setIsLoggedIn(false)
-    setLoginForm({ email: '', password: '' })
+  const handleSignUpSuccess = (email: string) => {
+    setConfirmEmail(email)
+    setAuthView('confirm')
   }
 
-  if (!isLoggedIn) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full space-y-8">
@@ -31,55 +46,26 @@ export default function Home() {
             <p className="text-gray-600">Connect, Learn, and Study Together</p>
           </div>
           
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  value={loginForm.email}
-                  onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200"
-                  placeholder="Enter your email"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  required
-                  value={loginForm.password}
-                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-200"
-                  placeholder="Enter your password"
-                />
-              </div>
-              
-              <button
-                type="submit"
-                className="w-full bg-primary-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition duration-200"
-              >
-                Sign In
-              </button>
-            </form>
-            
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
-                <a href="#" className="text-primary-600 hover:text-primary-500 font-medium">
-                  Sign up here
-                </a>
-              </p>
-            </div>
-          </div>
+          {authView === 'login' && (
+            <LoginForm
+              onSwitchToSignUp={() => setAuthView('signup')}
+              onSwitchToForgotPassword={() => setAuthView('forgot')}
+            />
+          )}
+          
+          {authView === 'signup' && (
+            <SignUpForm
+              onSwitchToLogin={() => setAuthView('login')}
+              onSignUpSuccess={handleSignUpSuccess}
+            />
+          )}
+          
+        {authView === 'confirm' && (
+          <ConfirmSignUpForm
+            email={confirmEmail}
+            onBackToLogin={() => setAuthView('login')}
+          />
+        )}
         </div>
       </div>
     )
@@ -95,7 +81,7 @@ export default function Home() {
               <h1 className="text-2xl font-bold text-gray-900">Study Group</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-gray-700">Welcome back!</span>
+              <span className="text-gray-700">Welcome, {user.username}!</span>
               <button
                 onClick={handleLogout}
                 className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-200"
@@ -204,3 +190,4 @@ export default function Home() {
     </div>
   )
 }
+
