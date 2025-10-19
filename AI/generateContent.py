@@ -728,17 +728,22 @@ def getFlashCards(file_path: str, num: int):
 
 def query(query):
     parameters = query.splitlines()
-    if(parameters[0] == "getSummary"):
-        return (getSummary(parameters[1]))
-    if(parameters[0] == "getQuestions"):
-        return (getQuestions(parameters[1], parameters[2]))
-    if(parameters[0] == "getFlashCards"):
-        return (getFlashCards(parameters[1], parameters[2]))
-    if(parameters[0] == "checkAnswer"):
-        return (checkAnswer(parameters[1], parameters[2], parameters[3]))
-    if(parameters[0] == "search"):
-        seperator = "\n"
-        return (seperator.join(search(parameters[1])))
+    searchThrough = search(parameters[0])
+    result = ""
+    for s in searchThrough:
+        result += getContents(s)
+    with open("output.txt", 'w', encoding='utf-8') as f:
+        parameters = f.write(result)
+    if(parameters[1] == "getSummary"):
+        return (getSummary("output.txt"))
+    if(parameters[1] == "getQuestions"):
+        return (getQuestions("output.txt", parameters[2]))
+    if(parameters[1] == "getFlashCards"):
+        return (getFlashCards("output.txt", parameters[2]))
+    if(parameters[1] == "checkAnswer"):
+        return (checkAnswer("output.txt", parameters[2], parameters[3]))
+    if(parameters[1] == "search"):
+        return result
 
 def main():
     try:

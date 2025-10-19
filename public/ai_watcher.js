@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const QUERY_FILE = path.join(__dirname, 'user_ai_query.txt');
+const QUERY_FILE = path.join(__dirname, '../AI/user_ai_query.txt');
 const RESPONSE_FILE = path.join(__dirname, 'user_ai_response.txt');
 
 // Function to send a user query
