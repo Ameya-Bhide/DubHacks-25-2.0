@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import DownloadLocationModal from './DownloadLocationModal'
 
 interface FileNotification {
   id: string
@@ -24,6 +25,12 @@ interface FileNotificationsProps {
 export default function FileNotifications({ userId, isOpen, onClose, onFileDownloaded }: FileNotificationsProps) {
   const [notifications, setNotifications] = useState<FileNotification[]>([])
   const [loading, setLoading] = useState(false)
+  const [showDownloadModal, setShowDownloadModal] = useState(false)
+  const [pendingDownload, setPendingDownload] = useState<{
+    fileId: string
+    fileName: string
+    notificationId: string
+  } | null>(null)
 
   useEffect(() => {
     if (isOpen && userId) {
@@ -56,7 +63,17 @@ export default function FileNotifications({ userId, isOpen, onClose, onFileDownl
     }
   }
 
-  const handleDownloadFile = async (fileId: string, fileName: string, notificationId: string) => {
+  const handleDownloadFile = (fileId: string, fileName: string, notificationId: string) => {
+    // Set up the pending download and show the modal
+    setPendingDownload({ fileId, fileName, notificationId })
+    setShowDownloadModal(true)
+  }
+
+  const handleDownloadConfirm = async (downloadPath: string) => {
+    if (!pendingDownload) return
+
+    const { fileId, fileName, notificationId } = pendingDownload
+
     try {
       // First, get the file record to get the actual S3 key
       const fileResponse = await fetch('/api/study-group-files', {
@@ -85,21 +102,24 @@ export default function FileNotifications({ userId, isOpen, onClose, onFileDownl
         return
       }
 
-      // Now download the file using the correct S3 key
-      const response = await fetch(`/api/download-file?s3Key=${encodeURIComponent(s3Key)}`)
+      // Download the file to the chosen path
+      const downloadResponse = await fetch('/api/download-to-path', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          s3Key: s3Key,
+          fileName: fileResult.fileRecord.fileName || fileName,
+          userId: userId,
+          customPath: downloadPath // Pass the custom path
+        })
+      })
       
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = fileResult.fileRecord.fileName || fileName
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-        
-        // Record the download in the database
+      const downloadResult = await downloadResponse.json()
+      
+      if (downloadResult.success) {
+        // Record the download in the database with the actual file path
         const recordResponse = await fetch('/api/study-group-files', {
           method: 'POST',
           headers: {
@@ -109,7 +129,8 @@ export default function FileNotifications({ userId, isOpen, onClose, onFileDownl
             action: 'recordDownload',
             data: { 
               fileId: fileId,
-              userId: userId
+              userId: userId,
+              actualFilePath: downloadResult.actualFilePath || downloadResult.filePath // Use actual path if available, fallback to user-friendly path
             }
           })
         })
@@ -117,26 +138,26 @@ export default function FileNotifications({ userId, isOpen, onClose, onFileDownl
         const recordResult = await recordResponse.json()
         
         if (recordResult.success) {
-          // Show download acknowledgement
-          alert(`✅ File "${fileResult.fileRecord.fileName || fileName}" has been downloaded successfully and added to your Documents!`)
+          // Show download acknowledgement with file path
+          alert(`✅ File "${fileResult.fileRecord.fileName || fileName}" has been downloaded successfully and added to your Documents!\n\nFile saved to: ${downloadResult.filePath}`)
         } else {
           // Still show success for download, but mention the recording failed
-          alert(`✅ File "${fileResult.fileRecord.fileName || fileName}" has been downloaded successfully! (Note: Could not add to Documents)`)
-        }
-        
-        // Mark notification as read after successful download
-        await markAsRead(notificationId)
-        
-        // Reload notifications to update the UI
-        loadNotifications()
-        
-        // Notify parent component to refresh Documents tab
-        if (onFileDownloaded) {
-          onFileDownloaded()
+          alert(`✅ File "${fileResult.fileRecord.fileName || fileName}" has been downloaded successfully!\n\nFile saved to: ${downloadResult.filePath}\n\n(Note: Could not add to Documents)`)
         }
       } else {
-        const errorData = await response.json()
-        alert(`Failed to download file: ${errorData.error || 'Unknown error'}`)
+        alert(`❌ Failed to download file: ${downloadResult.error}`)
+        return
+      }
+        
+      // Mark notification as read after successful download
+      await markAsRead(notificationId)
+      
+      // Reload notifications to update the UI
+      loadNotifications()
+      
+      // Notify parent component to refresh Documents tab
+      if (onFileDownloaded) {
+        onFileDownloaded()
       }
     } catch (error) {
       console.error('Error downloading file:', error)
@@ -249,6 +270,21 @@ export default function FileNotifications({ userId, isOpen, onClose, onFileDownl
           )}
         </div>
       </div>
+
+      {/* Download Location Modal */}
+      <DownloadLocationModal
+        isOpen={showDownloadModal}
+        fileName={pendingDownload?.fileName || ''}
+        onClose={() => {
+          setShowDownloadModal(false)
+          setPendingDownload(null)
+        }}
+        onConfirm={(downloadPath) => {
+          setShowDownloadModal(false)
+          handleDownloadConfirm(downloadPath)
+          setPendingDownload(null)
+        }}
+      />
     </div>
   )
 }

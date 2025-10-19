@@ -78,7 +78,7 @@ export default function Home() {
         isPersonal: formData.studyGroupName === 'Personal'
       }
 
-      // Save file record to .ai_helper system
+      // Save file record to .ai_helper system (for local storage)
       const saveResponse = await fetch('/api/ai-helper-files', {
         method: 'POST',
         headers: {
@@ -93,16 +93,61 @@ export default function Home() {
       const saveResult = await saveResponse.json()
       
       if (saveResult.success) {
-        console.log('File record saved successfully:', saveResult)
+        console.log('File record saved to .ai_helper successfully:', saveResult)
+        
+        // If it's a study group file (not personal), also save to DynamoDB for notifications
+        if (formData.studyGroupName !== 'Personal') {
+          // Create FormData for S3 upload
+          const uploadFormData = new FormData()
+          uploadFormData.append('file', file)
+          uploadFormData.append('studyGroupName', formData.studyGroupName)
+          uploadFormData.append('fileName', formData.fileName)
+          uploadFormData.append('description', formData.description)
+          uploadFormData.append('dateCreated', formData.date)
+          uploadFormData.append('className', formData.className)
+          uploadFormData.append('uploadedBy', user?.username || 'unknown-user')
+
+          // Upload file to S3
+          const uploadResponse = await fetch('/api/upload-file', {
+            method: 'POST',
+            body: uploadFormData
+          })
+          
+          const uploadResult = await uploadResponse.json()
+          
+          if (uploadResult.success) {
+            // Save file record to DynamoDB and notify study group members
+            const dbResponse = await fetch('/api/study-group-files', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'saveFileRecord',
+                data: { fileRecord: uploadResult.fileRecord }
+              })
+            })
+            
+            const dbResult = await dbResponse.json()
+            
+            if (dbResult.success) {
+              console.log('File uploaded to S3 and shared with study group members:', dbResult)
+              alert(`File uploaded successfully and shared with ${formData.studyGroupName} members!`)
+            } else {
+              console.error('Error saving to DynamoDB:', dbResult.error)
+              alert(`File saved locally but failed to share with group: ${dbResult.error}`)
+            }
+          } else {
+            console.error('Error uploading to S3:', uploadResult.error)
+            alert(`File saved locally but failed to upload to S3: ${uploadResult.error}`)
+          }
+        } else {
+          // Personal file - only saved locally
+          alert('File uploaded successfully!')
+        }
         
         // Refresh the documents list
         loadDocuments()
-        
-        if (formData.studyGroupName !== 'Personal') {
-          alert(`File uploaded successfully and shared with ${formData.studyGroupName} members!`)
-        } else {
-          alert('File uploaded successfully!')
-        }
       } else {
         console.error('Error saving file record:', saveResult.error)
         alert(`Failed to save file record: ${saveResult.error}`)
@@ -280,8 +325,39 @@ export default function Home() {
 
   const handleDocumentOpen = async (filePath: string, fileName: string) => {
     try {
-      // For local files, show the file path
-      alert(`File location: ${filePath}\n\nYou can open it directly from your file system.`)
+      // Expand the file path (replace ~ with actual home directory)
+      const expandedPath = filePath.replace('~', process.env.HOME || process.env.USERPROFILE || '~')
+      
+      // For downloaded files, try to open them using the system's default application
+      if (filePath.includes('DownloadedFiles') || filePath.includes('UploadedFiles')) {
+        // Try to open the file using a system command
+        try {
+          const response = await fetch('/api/open-file', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              filePath: expandedPath
+            })
+          })
+          
+          const result = await response.json()
+          
+          if (result.success) {
+            alert(`✅ Opening file: ${fileName}\n\nFile location: ${expandedPath}`)
+          } else {
+            // Fallback: show the path and instructions
+            alert(`📁 File: ${fileName}\n\nFile location: ${expandedPath}\n\nYou can open this file by:\n1. Opening your file explorer\n2. Navigating to the path above\n3. Double-clicking the file`)
+          }
+        } catch (error) {
+          // Fallback: show the path and instructions
+          alert(`📁 File: ${fileName}\n\nFile location: ${expandedPath}\n\nYou can open this file by:\n1. Opening your file explorer\n2. Navigating to the path above\n3. Double-clicking the file`)
+        }
+      } else {
+        // For other files, just show the path
+        alert(`File location: ${expandedPath}\n\nYou can open it directly from your file system.`)
+      }
     } catch (error) {
       console.error('Error opening document:', error)
       alert('Failed to open document. Please try again.')

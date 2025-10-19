@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'recordDownload') {
-      const { fileId, userId } = data
+      const { fileId, userId, actualFilePath } = data
       
       // Get the original file record
       const getFileCommand = new GetCommand({
@@ -173,12 +173,15 @@ export async function POST(request: NextRequest) {
 
       const originalFile = fileResult.Item
       
+      // Use the actual file path if provided, otherwise create a predictable one
+      const downloadedFilePath = actualFilePath || `~/Documents/DownloadedFiles/${originalFile.fileName}`
+      
       // Create a new file record for the user's documents (downloaded copy)
       const downloadedFileRecord = {
         id: uuidv4(),
         fileName: originalFile.fileName,
         originalFileName: originalFile.originalFileName,
-        s3Key: originalFile.s3Key, // Same S3 key as original
+        filePath: downloadedFilePath, // Use the predictable local path
         studyGroupName: originalFile.studyGroupName,
         description: `Downloaded from ${originalFile.studyGroupName} - ${originalFile.description}`,
         dateCreated: originalFile.dateCreated,
@@ -196,7 +199,29 @@ export async function POST(request: NextRequest) {
         originalFileId: fileId // Reference to original file
       }
 
-      // Save the downloaded file record
+      // Save the downloaded file record to .ai_helper system
+      try {
+        const aiHelperResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/ai-helper-files`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'saveFileRecord',
+            data: downloadedFileRecord
+          })
+        })
+        
+        const aiHelperResult = await aiHelperResponse.json()
+        
+        if (!aiHelperResult.success) {
+          console.error('Failed to save to .ai_helper system:', aiHelperResult.error)
+        }
+      } catch (error) {
+        console.error('Error saving to .ai_helper system:', error)
+      }
+
+      // Also save the downloaded file record to DynamoDB for backward compatibility
       const putCommand = new PutCommand({
         TableName: FILES_TABLE,
         Item: downloadedFileRecord
