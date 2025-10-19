@@ -29,6 +29,8 @@ used as a source of chemical energy.
 Photosynthesis occurs in chloroplasts.
 `;
 
+const mockQuery = `Chemistry`
+
 // Sample YAML content to use for testing the search
 const mockYaml = `
 "~/docs/science/bio-101.txt":
@@ -82,14 +84,16 @@ async function runAllTests() {
   // Test: getSummary
   await callApi({
     action: "getSummary",
-    notesContent: mockNotes
+    notesContent: mockNotes,
+    query: mockQuery
   });
 
   // Test: getQuestions
   await callApi({
     action: "getQuestions",
     notesContent: mockNotes,
-    numQuestions: 3
+    numQuestions: 3,
+    query: mockQuery
   });
 
   // Test: checkAnswer
@@ -104,7 +108,8 @@ async function runAllTests() {
   await callApi({
     action: "getFlashCards",
     notesContent: mockNotes,
-    numCards: 5
+    numCards: 5,
+    query: mockQuery
   });
 
   // Test: getKeywords

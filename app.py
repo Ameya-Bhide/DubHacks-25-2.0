@@ -123,11 +123,12 @@ def api_handler():
         # --- Get Summary Action ---
         if action == "getSummary":
             notes_content = body.get("notesContent")
+            query = body.get("query")
             if not notes_content:
                 return create_error_response(400, "'notesContent' is required.")
             
             history = get_base_history(notes_content)
-            prompt = """Can you generate a summary based on my notes? They must be about 30% the size of my notes. 
+            prompt = f"""Can you generate a summary based on my notes based upon {query}? They must be about 30% the size of my notes.
 Avoid mentioning that you got this information from notes, and DO NOT under any circumstance put a beginning sentence describing your 
 task. Make it flow and sound human-like."""
             
@@ -139,11 +140,12 @@ task. Make it flow and sound human-like."""
         elif action == "getQuestions":
             notes_content = body.get("notesContent")
             num = body.get("numQuestions")
+            query = body.get("query")
             if not notes_content or not num:
                 return create_error_response(400, "'notesContent' and 'numQuestions' are required.")
             
             history = get_base_history(notes_content)
-            prompt = f"""Can you generate {num} exam style questions based on my notes? 
+            prompt = f"""Can you generate {num} exam style questions based on my notes and the topic {query}? 
 They must deal with 1 or 2 topics, 1-3 sentences, and 50-100 words. 
 Each question should be separated. Do not number the questions in any way, they should only be separated by a new line.
 Avoid mentioning that you got this information from notes, and 
@@ -176,11 +178,12 @@ If the answer is instead similar to 'I don't know', give a clear and educational
         elif action == "getFlashCards":
             notes_content = body.get("notesContent")
             num = body.get("numCards") # Renamed for clarity
+            query = body.get("query")
             if not notes_content or not num:
                 return create_error_response(400, "'notesContent' and 'numCards' are required.")
 
             history = get_base_history(notes_content)
-            prompt = f"""Can you generate {num} flash cards based on my notes? 
+            prompt = f"""Can you generate {num} flash cards based on my notes and the topic: {query}? 
 Each flash card follows the same format: One small question of 1 sentence with 5-30 words. Difficulty should range from very easy to slightly hard.
 Answers should be even shorter, 1-10 words that answer the question.
 Types of questions to include are: true and false questions, definition questions, questions with 1 word answers
