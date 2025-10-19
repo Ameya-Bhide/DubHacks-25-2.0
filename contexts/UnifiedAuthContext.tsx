@@ -18,7 +18,7 @@ interface AuthContextType {
   isAWSMode: boolean
   retryAWS: () => void
   signIn: (email: string, password: string) => Promise<any>
-  signUp: (email: string, password: string, givenName: string, familyName: string, university: string, className: string) => Promise<any>
+  signUp: (email: string, password: string, givenName: string, familyName: string) => Promise<any>
   signOut: () => Promise<void>
   confirmSignUp: (email: string, code: string) => Promise<any>
   resendSignUp: (email: string) => Promise<any>
@@ -129,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           return result
         },
-        signUp: async (email: string, password: string, givenName: string, familyName: string, university: string, className: string) => {
+        signUp: async (email: string, password: string, givenName: string, familyName: string) => {
           // First, create the Cognito user
           const cognitoResult = await awsSignUp({
             username: email,
@@ -153,9 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 userId: email, // Use email as user ID
                 email,
                 givenName,
-                familyName,
-                university,
-                className
+                familyName
               })
               console.log('✅ User profile created in DynamoDB')
             } catch (profileError) {
@@ -242,7 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           throw new Error('Invalid credentials')
         },
-        signUp: async (email: string, password: string, givenName: string, familyName: string, university: string, className: string) => {
+        signUp: async (email: string, password: string, givenName: string, familyName: string) => {
           // Create user profile in DynamoDB (dev mode uses localStorage)
           try {
             const { createUserProfile } = await import('@/lib/aws-user-profiles')
@@ -250,9 +248,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               userId: email,
               email,
               givenName,
-              familyName,
-              university,
-              className
+              familyName
             })
             console.log('✅ User profile created (dev mode)')
           } catch (profileError) {

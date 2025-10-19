@@ -1,4 +1,4 @@
-import { checkDynamoDBConfigFromBrowser, isElectron } from '@/lib/aws-config'
+import { checkDynamoDBConfigFromBrowser, isElectron, getBaseUrl } from '@/lib/aws-config'
 
 export interface StudyGroup {
   id: string
@@ -43,7 +43,7 @@ export interface Meeting {
 
 // Simple API call wrapper
 async function apiCall(action: string, data: any) {
-  const response = await fetch('/api/study-groups', {
+  const response = await fetch(`${getBaseUrl()}/api/study-groups`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, data })

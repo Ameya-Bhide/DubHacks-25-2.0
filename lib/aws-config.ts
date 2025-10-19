@@ -1,5 +1,13 @@
 import { Amplify } from 'aws-amplify'
 
+// Get the correct base URL for API calls
+export const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return 'http://localhost:3000'
+}
+
 // Check if we have real AWS configuration
 const hasRealAWSConfig = (): boolean => {
   return !!(process.env.NEXT_PUBLIC_AWS_USER_POOL_ID && 
@@ -54,7 +62,9 @@ const checkDynamoDBConfigFromBrowser = async (): Promise<boolean> => {
   
   // Always try API routes first (works in both browser and Electron)
   try {
-    const response = await fetch('/api/check-dynamodb-config')
+    // Use absolute URL to ensure we're hitting the correct port
+    const baseUrl = getBaseUrl()
+    const response = await fetch(`${baseUrl}/api/check-dynamodb-config`)
     if (!response.ok) {
       console.log('🔧 API route not available - checking environment variables')
       // Check if we have AWS credentials in environment

@@ -8,8 +8,8 @@ export interface UserProfile {
   email: string
   givenName: string
   familyName: string
-  university: string
-  className: string
+  university?: string
+  className?: string
   createdAt: string
   updatedAt: string
 }
