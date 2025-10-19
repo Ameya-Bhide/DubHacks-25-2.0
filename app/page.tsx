@@ -876,13 +876,19 @@ export default function Home() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Study Group Name:
                 </label>
-                <input
-                  type="text"
+                <select
                   name="studyGroupName"
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter study group name"
-                />
+                >
+                  <option value="">Select a study group</option>
+                  <option value="Personal">Personal</option>
+                  {studyGroups.map(group => (
+                    <option key={group.id} value={group.name}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
