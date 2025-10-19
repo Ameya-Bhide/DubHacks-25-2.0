@@ -15,6 +15,8 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
     },
     icon: path.join(__dirname, 'icon.png'), // You can add an icon later
     titleBarStyle: 'default',
@@ -27,7 +29,22 @@ function createWindow() {
     : `file://${path.join(__dirname, '../out/index.html')}`
   
   console.log('Loading URL:', startUrl)
-  mainWindow.loadURL(startUrl)
+  
+  // Add retry logic for development server
+  const loadApp = async () => {
+    try {
+      await mainWindow.loadURL(startUrl)
+    } catch (error) {
+      if (isDev) {
+        console.log('Development server not ready, retrying in 2 seconds...')
+        setTimeout(loadApp, 2000)
+      } else {
+        console.error('Failed to load app:', error)
+      }
+    }
+  }
+  
+  loadApp()
 
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {

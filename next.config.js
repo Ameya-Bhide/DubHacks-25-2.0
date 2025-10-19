@@ -5,6 +5,11 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
+  // Fix for Electron static asset loading
+  assetPrefix: process.env.NODE_ENV === 'development' ? '' : undefined,
+  // Ensure proper base path for Electron
+  basePath: '',
+  // Fix for webpack chunk loading issues
   webpack: (config, { isServer }) => {
     // Fix for webpack chunk loading issues
     if (!isServer) {
@@ -23,6 +28,9 @@ const nextConfig = {
           },
         },
       }
+      
+      // Fix for Electron asset loading
+      config.output.publicPath = '/'
     }
     return config
   }
