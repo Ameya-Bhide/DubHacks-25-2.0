@@ -57,6 +57,7 @@ export default function Home() {
   const [universityFilter, setUniversityFilter] = useState('')
   const [classNameFilter, setClassNameFilter] = useState('')
   const [findGroupsLoading, setFindGroupsLoading] = useState(false)
+  const [allMeetings, setAllMeetings] = useState<MeetingWithGroupName[]>([])
   const { user, loading, signOut, isAWSMode, retryAWS } = useAuth()
 
   // Handle URL tab parameter
@@ -269,6 +270,61 @@ export default function Home() {
     return !(year === 2026 && month === 11) // Can't go after December 2026
   }
 
+  // Helper function to get meetings for a specific date
+  const getMeetingsForDate = (date: Date): MeetingWithGroupName[] => {
+    const dateStr = date.toISOString().split('T')[0] // YYYY-MM-DD format
+    return allMeetings.filter(meeting => meeting.date === dateStr)
+  }
+
+  // Helper function to get documents for a specific date
+  const getDocumentsForDate = (date: Date): any[] => {
+    const dateStr = date.toISOString().split('T')[0] // YYYY-MM-DD format
+    console.log('🔍 Filtering documents for date:', dateStr, 'Total documents:', documents.length)
+    
+    const filteredDocs = documents.filter(doc => {
+      // Check if document was created on this date or has a due date on this date
+      const docDate = doc.dateCreated || doc.date || doc.createdAt
+      const dueDate = doc.dueDate
+      
+      console.log('📄 Checking document:', doc.fileName, 'docDate:', docDate, 'dueDate:', dueDate)
+      
+      if (docDate) {
+        // Handle different date formats
+        let docDateStr: string
+        if (typeof docDate === 'string') {
+          // If it's already in YYYY-MM-DD format, use it directly
+          if (docDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            docDateStr = docDate
+          } else {
+            // Otherwise, parse it as a date
+            docDateStr = new Date(docDate).toISOString().split('T')[0]
+          }
+        } else {
+          docDateStr = new Date(docDate).toISOString().split('T')[0]
+        }
+        
+        console.log('📅 Document date comparison:', docDateStr, '===', dateStr, '?', docDateStr === dateStr)
+        if (docDateStr === dateStr) return true
+      }
+      
+      if (dueDate) {
+        const dueDateStr = new Date(dueDate).toISOString().split('T')[0]
+        console.log('⏰ Due date comparison:', dueDateStr, '===', dateStr, '?', dueDateStr === dateStr)
+        if (dueDateStr === dateStr) return true
+      }
+      
+      return false
+    })
+    
+    console.log('✅ Found documents for date:', filteredDocs.length, filteredDocs.map(d => d.fileName))
+    return filteredDocs
+  }
+
+  // Helper function to check if a date has meetings or documents
+  const hasEventsOnDate = (date: Date): boolean => {
+    return getMeetingsForDate(date).length > 0 || getDocumentsForDate(date).length > 0
+  }
+
   // Load study groups, invites, user profile, and documents when user is authenticated
   useEffect(() => {
     if (user) {
@@ -400,6 +456,9 @@ export default function Home() {
       }
       
       console.log(`📅 Total meetings found: ${allMeetings.length}`)
+      
+      // Store all meetings for calendar functionality
+      setAllMeetings(allMeetings)
       
       // Filter for upcoming meetings and sort by date
       const now = new Date()
@@ -1156,7 +1215,6 @@ export default function Home() {
               {/* Upcoming Dates */}
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Dates</h3>
-                {console.log('🎯 Rendering upcoming meetings:', upcomingMeetings.length, upcomingMeetings)}
                 {upcomingMeetings.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
@@ -1781,29 +1839,61 @@ export default function Home() {
               ))}
               
               {/* Calendar days */}
-              {getDaysInMonth(currentMonth).map((day, index) => (
-                <div
-                  key={index}
-                  className={`p-2 text-center text-sm rounded cursor-pointer transition duration-200 ${
-                    day
-                      ? 'hover:bg-blue-100 hover:text-blue-700 text-gray-900'
-                      : 'text-gray-300'
-                  } ${
-                    day && day.getDate() === new Date().getDate() && 
-                    day.getMonth() === new Date().getMonth() && 
-                    day.getFullYear() === new Date().getFullYear()
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : ''
-                  }`}
-                  onClick={() => day && handleDateClick(day)}
-                >
-                  {day ? day.getDate() : ''}
-                </div>
-              ))}
+              {getDaysInMonth(currentMonth).map((day, index) => {
+                const hasEvents = day ? hasEventsOnDate(day) : false
+                const meetingsOnDay = day ? getMeetingsForDate(day) : []
+                const documentsOnDay = day ? getDocumentsForDate(day) : []
+                
+                return (
+                  <div
+                    key={index}
+                    className={`p-2 text-center text-sm rounded cursor-pointer transition duration-200 relative ${
+                      day
+                        ? 'hover:bg-blue-100 hover:text-blue-700 text-gray-900'
+                        : 'text-gray-300'
+                    } ${
+                      day && day.getDate() === new Date().getDate() && 
+                      day.getMonth() === new Date().getMonth() && 
+                      day.getFullYear() === new Date().getFullYear()
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : ''
+                    }`}
+                    onClick={() => day && handleDateClick(day)}
+                  >
+                    {day ? day.getDate() : ''}
+                    
+                    {/* Event indicators */}
+                    {day && hasEvents && (
+                      <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex space-x-1">
+                        {meetingsOnDay.length > 0 && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full" title={`${meetingsOnDay.length} meeting(s)`}></div>
+                        )}
+                        {documentsOnDay.length > 0 && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full" title={`${documentsOnDay.length} document(s)`}></div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
             
-            <div className="text-center text-sm text-gray-500 mt-4">
-              Click on any date to view study group meetups and uploaded files
+            <div className="mt-6">
+              <div className="text-center text-sm text-gray-500 mb-4">
+                Click on any date to view study group meetups and uploaded files
+              </div>
+              
+              {/* Calendar Legend */}
+              <div className="flex items-center justify-center space-x-6 text-xs text-gray-600">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span>Meetings</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span>Documents</span>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1840,8 +1930,15 @@ export default function Home() {
               const dateParts = dateValue.split('-')
               const formattedDate = `${dateParts[1]}-${dateParts[2]}-${dateParts[0]}`
               
+              const dueDateValue = formData.get('dueDate') as string
+              const formattedDueDate = dueDateValue ? (() => {
+                const dueDateParts = dueDateValue.split('-')
+                return `${dueDateParts[1]}-${dueDateParts[2]}-${dueDateParts[0]}`
+              })() : undefined
+
               const data = {
                 date: formattedDate,
+                dueDate: formattedDueDate,
                 studyGroupName: formData.get('studyGroupName') as string,
                 className: formData.get('className') as string,
                 fileName: formData.get('fileName') as string,
@@ -1874,6 +1971,18 @@ export default function Home() {
                   defaultValue={new Date().toISOString().split('T')[0]}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Due Date (Optional):
+                </label>
+                <input
+                  type="date"
+                  name="dueDate"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">Set a due date to see it on the calendar</p>
               </div>
 
               <div>
@@ -1982,12 +2091,47 @@ export default function Home() {
                 <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                Study Group Meetups
+                Study Group Meetups ({getMeetingsForDate(selectedDate).length})
               </h5>
-              <div className="bg-gray-50 rounded-lg p-4 text-center">
-                <div className="text-gray-500 text-sm">
-                  No study group meetups scheduled for this date
-                </div>
+              <div className="bg-gray-50 rounded-lg p-4">
+                {getMeetingsForDate(selectedDate).length === 0 ? (
+                  <div className="text-center">
+                    <div className="text-gray-500 text-sm">
+                      No study group meetups scheduled for this date
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {getMeetingsForDate(selectedDate).map((meeting) => (
+                      <div key={meeting.id} className="bg-white rounded-lg p-3 border border-gray-200">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h6 className="font-medium text-gray-900 text-sm">{meeting.title}</h6>
+                            <p className="text-xs text-gray-600 mt-1">{meeting.groupName}</p>
+                            <div className="flex items-center space-x-3 mt-2 text-xs text-gray-500">
+                              <span className="flex items-center">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {meeting.time}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                {meeting.meetingType === 'in-person' ? 'In-Person' : 'Online'}
+                              </span>
+                            </div>
+                            {meeting.description && (
+                              <p className="text-xs text-gray-600 mt-2">{meeting.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1997,12 +2141,69 @@ export default function Home() {
                 <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                Uploaded Files
+                Documents & Files ({getDocumentsForDate(selectedDate).length})
               </h5>
-              <div className="bg-gray-50 rounded-lg p-4 text-center">
-                <div className="text-gray-500 text-sm">
-                  No files uploaded on this date
-                </div>
+              <div className="bg-gray-50 rounded-lg p-4">
+                {getDocumentsForDate(selectedDate).length === 0 ? (
+                  <div className="text-center">
+                    <div className="text-gray-500 text-sm">
+                      No documents or files for this date
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {getDocumentsForDate(selectedDate).map((doc, index) => {
+                      const isDueDate = doc.dueDate && new Date(doc.dueDate).toISOString().split('T')[0] === selectedDate.toISOString().split('T')[0]
+                      const docDate = doc.dateCreated || doc.date || doc.createdAt
+                      const isCreatedDate = docDate && (() => {
+                        let docDateStr: string
+                        if (typeof docDate === 'string' && docDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                          docDateStr = docDate
+                        } else {
+                          docDateStr = new Date(docDate).toISOString().split('T')[0]
+                        }
+                        return docDateStr === selectedDate.toISOString().split('T')[0]
+                      })()
+                      
+                      return (
+                        <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h6 className="font-medium text-gray-900 text-sm">{doc.fileName || doc.originalFileName || doc.name}</h6>
+                              {doc.studyGroupName && (
+                                <p className="text-xs text-gray-600 mt-1">{doc.studyGroupName}</p>
+                              )}
+                              <div className="flex items-center space-x-3 mt-2 text-xs text-gray-500">
+                                {isCreatedDate && (
+                                  <span className="flex items-center text-green-600">
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Created
+                                  </span>
+                                )}
+                                {isDueDate && (
+                                  <span className="flex items-center text-red-600">
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                    </svg>
+                                    Due
+                                  </span>
+                                )}
+                                {doc.className && (
+                                  <span className="text-gray-500">{doc.className}</span>
+                                )}
+                              </div>
+                              {doc.description && (
+                                <p className="text-xs text-gray-600 mt-2">{doc.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
