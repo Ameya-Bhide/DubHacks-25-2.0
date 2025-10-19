@@ -1,11 +1,11 @@
 import { Amplify } from 'aws-amplify'
 
 // Check if we have real AWS configuration
-const hasRealAWSConfig = () => {
-  return process.env.NEXT_PUBLIC_AWS_USER_POOL_ID && 
+const hasRealAWSConfig = (): boolean => {
+  return !!(process.env.NEXT_PUBLIC_AWS_USER_POOL_ID && 
          process.env.NEXT_PUBLIC_AWS_USER_POOL_ID !== 'us-east-1_XXXXXXXXX' &&
          process.env.NEXT_PUBLIC_AWS_USER_POOL_WEB_CLIENT_ID &&
-         process.env.NEXT_PUBLIC_AWS_USER_POOL_WEB_CLIENT_ID !== 'your-client-id'
+         process.env.NEXT_PUBLIC_AWS_USER_POOL_WEB_CLIENT_ID !== 'your-client-id')
 }
 
 // AWS Cognito configuration
@@ -19,6 +19,7 @@ const awsConfig = {
         email: true,
         username: true,
       },
+      identityPoolId: process.env.NEXT_PUBLIC_AWS_IDENTITY_POOL_ID || 'us-east-1:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
     },
   },
 }

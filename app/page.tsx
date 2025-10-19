@@ -1,14 +1,21 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/UnifiedAuthContext'
 import LoginForm from '@/components/LoginForm'
 import SignUpForm from '@/components/SignUpForm'
 import ConfirmSignUpForm from '@/components/ConfirmSignUpForm'
+import CreateGroupModal from '@/components/CreateGroupModal'
+import InviteCard from '@/components/InviteCard'
+import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup } from '@/lib/aws-study-groups'
+import { hasRealAWSConfig } from '@/lib/aws-config'
 
 type AuthView = 'login' | 'signup' | 'confirm' | 'forgot'
 
 export default function Home() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [authView, setAuthView] = useState<AuthView>('login')
   const [confirmEmail, setConfirmEmail] = useState('')
   const [activeTab, setActiveTab] = useState('home')
@@ -16,7 +23,19 @@ export default function Home() {
   const [showCalendarModal, setShowCalendarModal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const { user, loading, signOut } = useAuth()
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
+  const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([])
+  const [invites, setInvites] = useState<any[]>([])
+  const [showInvites, setShowInvites] = useState(false)
+  const { user, loading, signOut, isAWSMode, retryAWS } = useAuth()
+
+  // Handle URL tab parameter
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab && ['home', 'ai', 'study-group', 'documents', 'calendar'].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
 
   const handleLogout = async () => {
     try {
@@ -117,6 +136,122 @@ export default function Home() {
     const year = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
     return !(year === 2026 && month === 11) // Can't go after December 2026
+  }
+
+  // Load study groups and invites when user is authenticated
+  useEffect(() => {
+    if (user) {
+      loadStudyGroups()
+      loadInvites()
+    }
+  }, [user])
+
+  const loadStudyGroups = async () => {
+    if (!user) return
+
+    try {
+      const isAWS = hasRealAWSConfig()
+      const groups = isAWS
+        ? await getUserStudyGroups(user.username) // Real AWS call
+        : await devStudyGroups.getUserStudyGroups(user.username)
+
+      setStudyGroups(groups)
+      
+      // Debug: Log all groups to console
+      console.log('📊 All Study Groups:', groups)
+      if (isAWS) {
+        console.log('🔗 AWS Mode - Data loaded from DynamoDB')
+      } else {
+        console.log('💾 Dev Mode - Data stored in localStorage')
+      }
+    } catch (error) {
+      console.error('Error loading study groups:', error)
+    }
+  }
+
+  const loadInvites = async () => {
+    if (!user) return
+
+    try {
+      const response = await fetch('/api/study-groups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'getUserInvites',
+          data: { userId: user.username }
+        })
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        setInvites(result.invites)
+      }
+    } catch (error) {
+      console.error('Error loading invites:', error)
+    }
+  }
+
+  const handleInviteResponse = async (inviteId: string, response: 'accept' | 'decline') => {
+    if (!user) return
+
+    try {
+      const apiResponse = await fetch('/api/study-groups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'respondToInvite',
+          data: { 
+            inviteId, 
+            userId: user.username, 
+            response 
+          }
+        })
+      })
+
+      const result = await apiResponse.json()
+      if (result.success) {
+        // Remove the invite from the list
+        setInvites(prev => prev.filter(invite => invite.id !== inviteId))
+        
+        // If accepted, reload study groups
+        if (response === 'accept') {
+          loadStudyGroups()
+        }
+        
+        alert(result.message)
+      } else {
+        alert(result.error || 'Failed to respond to invite')
+      }
+    } catch (error) {
+      console.error('Error responding to invite:', error)
+      alert('Failed to respond to invite')
+    }
+  }
+
+  const handleCreateGroup = async (groupData: any) => {
+    if (!user) return
+
+    try {
+      const isAWS = hasRealAWSConfig()
+      const newGroup = isAWS
+        ? await createStudyGroup(groupData, user.username) // Real AWS call
+        : await devStudyGroups.createStudyGroup(groupData, user.username)
+      
+      setStudyGroups(prev => [newGroup, ...prev])
+      console.log('Study group created:', newGroup)
+      if (isAWS) {
+        console.log('🔗 AWS Mode - Group saved to DynamoDB')
+      } else {
+        console.log('💾 Dev Mode - Group saved to localStorage')
+      }
+    } catch (error) {
+      console.error('Error creating study group:', error)
+      throw error
+    }
   }
 
   if (loading) {
@@ -234,6 +369,27 @@ export default function Home() {
             {/* User Actions */}
             <div className="flex items-center space-x-4">
               <span className="text-gray-700">Welcome, {user.username}!</span>
+              
+              {/* Mode Indicator */}
+              <div className="flex items-center space-x-2">
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  isAWSMode 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {isAWSMode ? 'AWS Mode' : 'Dev Mode'}
+                </span>
+                {!isAWSMode && hasRealAWSConfig() && (
+                  <button
+                    onClick={retryAWS}
+                    className="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 transition duration-200"
+                    title="Retry AWS authentication"
+                  >
+                    Retry AWS
+                  </button>
+                )}
+              </div>
+              
               <button
                 onClick={handleLogout}
                 className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-200"
@@ -385,25 +541,145 @@ export default function Home() {
 
         {/* Study Group Tab Content */}
         {activeTab === 'study-group' && (
-          <div className="bg-white rounded-xl shadow-sm p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Study Groups</h2>
-            <div className="text-center py-12">
-              <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Manage Study Groups</h3>
-              <p className="text-gray-600 mb-6">Create, join, and manage your study groups from here.</p>
-              <div className="flex space-x-4 justify-center">
-                <button className="bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition duration-200">
-                  Create Group
+          <div className="space-y-6">
+            {/* Header with Action Buttons */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900">My Study Groups</h2>
+              <div className="flex items-center space-x-3">
+                <button 
+                  onClick={() => setShowInvites(!showInvites)}
+                  className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition duration-200 font-medium flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                  Invites
+                  {invites.length > 0 && (
+                    <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">{invites.length}</span>
+                  )}
                 </button>
-                <button className="bg-gray-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-gray-700 transition duration-200">
-                  Join Group
+                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-medium flex items-center">
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Find Groups
                 </button>
               </div>
             </div>
+
+            {/* Invites Section */}
+            {showInvites && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Invites</h3>
+                {invites.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-600">No pending invites</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {invites.map(invite => (
+                      <InviteCard
+                        key={invite.id}
+                        invite={invite}
+                        onRespond={handleInviteResponse}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Main Study Groups Content */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              {studyGroups.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Study Groups Yet</h3>
+                  <p className="text-gray-600 mb-6">Start your learning journey by creating or joining a study group.</p>
+                  <button 
+                    onClick={() => setIsCreateGroupOpen(true)}
+                    className="bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition duration-200"
+                  >
+                    Create Your First Group
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {studyGroups.map(group => (
+                    <div 
+                      key={group.id} 
+                      onClick={() => router.push(`/study-group/${group.id}`)}
+                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">{group.name}</h3>
+                          <p className="text-gray-600 text-sm mb-3">{group.description}</p>
+                          <div className="flex items-center space-x-4 text-sm text-gray-500">
+                            <span className="flex items-center">
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                              </svg>
+                              {group.memberCount}/{group.maxMembers} members
+                            </span>
+                            <span className="flex items-center">
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {group.meetingFrequency} • {group.meetingDay} at {group.meetingTime}
+                            </span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              group.subject === 'Computer Science' ? 'bg-blue-100 text-blue-800' :
+                              group.subject === 'Data Science' ? 'bg-green-100 text-green-800' :
+                              group.subject === 'Mathematics' ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {group.subject}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="flex -space-x-2">
+                            {group.members.slice(0, 3).map((member, index) => (
+                              <div
+                                key={member}
+                                className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full border-2 border-white flex items-center justify-center text-white text-xs font-medium"
+                              >
+                                {member.charAt(0).toUpperCase()}
+                              </div>
+                            ))}
+                            {group.members.length > 3 && (
+                              <div className="w-8 h-8 bg-gray-200 rounded-full border-2 border-white flex items-center justify-center text-gray-600 text-xs font-medium">
+                                +{group.members.length - 3}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Floating Add Group Button */}
+            <button 
+              onClick={() => setIsCreateGroupOpen(true)}
+              className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </button>
           </div>
         )}
 
@@ -700,6 +976,13 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Create Group Modal */}
+      <CreateGroupModal
+        isOpen={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onCreateGroup={handleCreateGroup}
+      />
     </div>
   )
 }
