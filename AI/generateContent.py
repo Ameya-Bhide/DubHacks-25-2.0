@@ -13,9 +13,6 @@ bedrock = boto3.client("bedrock-runtime", region_name=REGION)
 
 SYSTEM_PROMPT = """You are a small Bedrock agent who will write in a professional and educational manner."""
 
-# This is the path to your search index file *within* the Lambda package.
-# You must include this YAML file in the .zip file you upload to Lambda.
-SEARCH_INDEX_FILE = 'search_index.yaml' 
 
 # --- Core Bedrock Function ---
 
@@ -236,9 +233,7 @@ DO NOT under any circumstance put a beginning sentence describing your task. Mak
                     # Ensure 'info' is a dictionary as expected
                     info_dict = info if isinstance(info, dict) else {}
                     
-                    if k.lower() in info_dict.get("one_sentence", "").lower() or \
-                       k.lower() in info_dict.get("five_sentence", "").lower():
-                        
+                    if k.lower() in info_dict.get("one_sentence", "").lower():
                         results.append(file_path)
                         seen_paths.add(file_path)
             
@@ -517,8 +512,6 @@ def search(file_path: str, prompt: str) -> []:
             if file_path in result:
                 continue
             if k in info.get("one_sentence", ""):
-                result.append(file_path)
-            elif k in info.get("five_sentence", ""):
                 result.append(file_path)
     return result
 
