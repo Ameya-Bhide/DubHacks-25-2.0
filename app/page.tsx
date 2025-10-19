@@ -52,6 +52,18 @@ export default function Home() {
     setAuthView('confirm')
   }
 
+  // Function to handle file upload data
+  const make_file = (jsonData: any) => {
+    console.log('make_file called with:', jsonData)
+    // TODO: Implement actual file processing logic here
+    // This could include:
+    // - Saving to database
+    // - Uploading to cloud storage
+    // - Processing the file
+    // - Sending to API endpoint
+    return { success: true, message: 'File processed successfully' }
+  }
+
   const handleUploadSubmit = (formData: any) => {
     const jsonData = {
       "File path": formData.filePath,
@@ -63,8 +75,12 @@ export default function Home() {
     }
     
     console.log('Upload form data:', jsonData)
+    
+    // Call the make_file function with the JSON data
+    const result = make_file(jsonData)
+    console.log('make_file result:', result)
+    
     setShowUploadModal(false)
-    // Here you can add logic to actually upload the file or send the data to a server
   }
 
   const handleDateClick = (date: Date) => {
@@ -844,15 +860,15 @@ export default function Home() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date (enter as MM-DD-YY):
+                  Date (enter as MM-DD-YYYY):
                 </label>
                 <input
                   type="text"
                   name="date"
                   required
-                  pattern="\d{2}-\d{2}-\d{2}"
+                  pattern="\d{2}-\d{2}-\d{4}"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="MM-DD-YY"
+                  placeholder="MM-DD-YYYY"
                 />
               </div>
 
