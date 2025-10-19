@@ -15,6 +15,7 @@ export default function Home() {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showCalendarModal, setShowCalendarModal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [currentMonth, setCurrentMonth] = useState(new Date())
   const { user, loading, signOut } = useAuth()
 
   const handleLogout = async () => {
@@ -80,6 +81,42 @@ export default function Home() {
       month: 'long',
       day: 'numeric'
     })
+  }
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentMonth)
+    
+    if (direction === 'prev') {
+      newDate.setMonth(newDate.getMonth() - 1)
+    } else {
+      newDate.setMonth(newDate.getMonth() + 1)
+    }
+    
+    // Check boundaries (January 2025 to December 2026)
+    const year = newDate.getFullYear()
+    const month = newDate.getMonth()
+    
+    if (year < 2025 || (year === 2025 && month < 0)) {
+      return // Don't navigate before January 2025
+    }
+    
+    if (year > 2026 || (year === 2026 && month > 11)) {
+      return // Don't navigate after December 2026
+    }
+    
+    setCurrentMonth(newDate)
+  }
+
+  const canNavigatePrev = () => {
+    const year = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    return !(year === 2025 && month === 0) // Can't go before January 2025
+  }
+
+  const canNavigateNext = () => {
+    const year = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    return !(year === 2026 && month === 11) // Can't go after December 2026
   }
 
   if (loading) {
@@ -397,8 +434,40 @@ export default function Home() {
           <div className="bg-white rounded-xl shadow-sm p-8">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900">Calendar</h2>
-              <div className="text-lg font-medium text-gray-700">
-                {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              
+              {/* Month Navigation */}
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => navigateMonth('prev')}
+                  disabled={!canNavigatePrev()}
+                  className={`p-2 rounded-lg transition duration-200 ${
+                    canNavigatePrev()
+                      ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                      : 'text-gray-300 cursor-not-allowed'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                
+                <div className="text-lg font-medium text-gray-700 min-w-[140px] text-center">
+                  {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </div>
+                
+                <button
+                  onClick={() => navigateMonth('next')}
+                  disabled={!canNavigateNext()}
+                  className={`p-2 rounded-lg transition duration-200 ${
+                    canNavigateNext()
+                      ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                      : 'text-gray-300 cursor-not-allowed'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </div>
             </div>
             
@@ -412,7 +481,7 @@ export default function Home() {
               ))}
               
               {/* Calendar days */}
-              {getDaysInMonth(new Date()).map((day, index) => (
+              {getDaysInMonth(currentMonth).map((day, index) => (
                 <div
                   key={index}
                   className={`p-2 text-center text-sm rounded cursor-pointer transition duration-200 ${
