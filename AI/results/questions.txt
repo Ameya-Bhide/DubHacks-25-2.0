@@ -1,5 +1,5 @@
-What is the main difference between perfect secrecy and computational security in symmetric-key cryptography? Discuss the trade-offs between these two approaches and their practical implications.
+Explain the concept of perfect secrecy in symmetric-key cryptography and how it relates to the one-time pad scheme.
 
-Explain the concept of a pseudorandom permutation (PRP) and its relationship to the security of block ciphers. How can the PRP notion be used to analyze the security of a block cipher like AES-128?
+What is the difference between the notions of a pseudorandom permutation (PRP) and a pseudorandom function (PRF) in the context of block ciphers? Discuss the relationship between these two concepts.
 
-Describe the role of randomization and nonces in achieving semantic security for symmetric-key encryption schemes. How does the IND-CPA security definition capture the idea of ciphertexts not leaking any additional information about the plaintexts?
+Describe the AES-128 block cipher in terms of its structure and the security guarantees it provides. How does the practical performance of AES-128 compare to the theoretical security properties of an ideal block cipher?

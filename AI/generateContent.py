@@ -1,10 +1,10 @@
 import json
 import os
-import datetime
 import boto3
-import zoneinfo
 import time
 from botocore.exceptions import ClientError
+import docx
+import fitz
 # --- FIX 1: Specify your AWS Region ---
 # Set your region here or via the AWS_REGION environment variable
 REGION = os.environ.get("AWS_REGION", "us-east-1") 
@@ -15,13 +15,7 @@ bedrock = boto3.client("bedrock-runtime", region_name=REGION)
 
 
 SYSTEM_PROMPT = """You are a small Bedrock agent who will write in a professional and educational"""
-"""
-If a tool is needed, respond with ONLY this JSON (no extra text):
-{"tool":"<name>","args":{...}}
-Available tools:
-- calc(op, a, b) -> op in [add, sub, mul, div]; a and b are numbers.
-If no tool is needed, just answer normally (no JSON). Be concise.
-"""
+
 
 # --- FIX 2: Updated call_bedrock to accept a message list ---
 def call_bedrock(messages: list) -> str:
@@ -50,35 +44,6 @@ def call_bedrock(messages: list) -> str:
     text = "".join([p.get("text","") for p in payload.get("content",[]) if p.get("type")=="text"])
     return text.strip()
 
-# --- Tool Functions (Slightly improved tool_get_time) ---
-"""
-def tool_get_time(zone: str | None = None):
-    tz = None
-    if zone:
-        try:
-            tz = zoneinfo.ZoneInfo(zone)
-        except zoneinfo.ZoneInfoNotFoundError:
-            # Invalid zone, fall back to local
-            print(f"Warning: Zone '{zone}' not found. Using local time.")
-            tz = datetime.datetime.now().astimezone().tzinfo
-    else:
-        # No zone provided, use local
-        tz = datetime.datetime.now().astimezone().tzinfo
-    
-    now = datetime.datetime.now(tz)
-    return now.strftime("%Y-%m-%d %H:%M:%S %Z")
-
-def tool_calc(op: str, a, b):
-    try:
-        x = float(a); y = float(b)
-        if op == "add": return x + y
-        if op == "sub": return x - y
-        if op == "mul": return x * y
-        if op == "div": return x / y if y != 0 else "Error: division by zero"
-        return f"Unknown op: {op}"
-    except Exception as e:
-        return f"Calc error: {e}"
-    """
 # --- Helper Function (Unchanged) ---
 def maybe_tool_call(text: str):
     """Checks if the model output is a JSON tool call."""
@@ -117,8 +82,6 @@ def handler(event, context):
         final_history = messages_for_first_call + [{"role": "assistant", "content": model_reply}]
         
         if call:
-            name = call.get("tool")
-            args = call.get("args", {}) or {}
             
             # --- Build history for the SECOND call ---
             # This correctly includes all previous context
@@ -170,9 +133,81 @@ def handler(event, context):
     }
 # --- FIX 3: Added main function for command-line execution ---
 # --- Updated main function to manage state ---
+
+def getContents(file_path: str) -> str:
+    """
+    Extracts the text content from a file (.txt, .docx, or .pdf).
+
+    Args:
+        file_path: The full path to the file.
+
+    Returns:
+        A string containing the text content of the file.
+        If an error occurs or the file type is unsupported,
+        an error message string is returned.
+
+    Requires:
+        - 'python-docx' for .docx files (pip install python-docx)
+        - 'PyMuPDF' for .pdf files (pip install PyMuPDF)
+    """
+    
+    # 1. Check if file exists
+    if not os.path.exists(file_path):
+        return f"Error: File not found at path: {file_path}"
+
+    # 2. Get the file extension and normalize it
+    # os.path.splitext splits "notes.txt" into ("notes", ".txt")
+    _, file_extension = os.path.splitext(file_path)
+    file_extension = file_extension.lower()
+
+    # 3. Process based on file type
+    if file_extension == '.txt':
+        try:
+            # Simple text file, just read it with utf-8 encoding
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            return f"Error reading TXT file: {e}"
+
+    elif file_extension == '.docx':
+        if docx is None:
+            return "Error: 'python-docx' library is not installed. Cannot read .docx file."
+        try:
+            # Open the docx file
+            doc = docx.Document(file_path)
+            # Extract text from all paragraphs and join them with a newline
+            full_text = [para.text for para in doc.paragraphs]
+            return '\n'.join(full_text)
+        except Exception as e:
+            # This can happen if the file is corrupt or not a valid docx
+            return f"Error reading DOCX file: {e}"
+
+    elif file_extension == '.pdf':
+        if fitz is None:
+            return "Error: 'PyMuPDF' (fitz) library is not installed. Cannot read .pdf file."
+        try:
+            # Open the PDF file
+            doc = fitz.open(file_path)
+            full_text = []
+            # Iterate through each page and get its text
+            for page in doc:
+                full_text.append(page.get_text())
+            doc.close()
+            # Join all pages' text with a newline
+            return '\n'.join(full_text)
+        except Exception as e:
+            # This can happen if the file is corrupt or password-protected
+            return f"Error reading PDF file: {e}"
+
+    else:
+        # Handle all other file types
+        return f"Error: Unsupported file type: {file_extension}. Only .txt, .docx, and .pdf are supported."
+
+
+
+
 def getSummary(file_path):
-    with open(file_path, 'r') as f:
-        content = f.read()
+    content = getContents(file_path)
     conversation_history = [
     {
         "role": "user", "content": content
@@ -222,8 +257,7 @@ def getSummary(file_path):
         print(f"Error: {e}")
 
 def getQuestions(file_path, num):
-    with open(file_path, 'r') as f:
-        content = f.read()
+    content = getContents(file_path)
     conversation_history = [
     {
         "role": "user", "content": content
@@ -276,8 +310,7 @@ def getQuestions(file_path, num):
 
 
 def checkAnswer(file_path, question, answer):
-    with open(file_path, 'r') as f:
-        content = f.read()
+    content = getContents(file_path)
     conversation_history = [
     {
         "role": "user", "content": content
@@ -329,6 +362,60 @@ def checkAnswer(file_path, question, answer):
         print(f"\n--- An unexpected Python error occurred ---")
         print(f"Error: {e}")
 
+def getFlashCards(file_path, num):
+    content = getContents(file_path)
+    conversation_history = [
+    {
+        "role": "user", "content": content
+    },
+    {
+        "role": "assistant",
+        "content": "Okay,  I got the notes, what should I do with it?"
+    }
+    ]
+    mock_event = {
+        "body": json.dumps({
+            "message": """Can you generate """+str(num)+""" flash cards based on my notes? 
+                Each flash card follows the same format: One small question of 1 sentence with 5-30 words. Difficulty should range from very easy to slightly hard.
+                Answers should be even shorter, 1-10 words that answer the question.
+                Types of questions to include are: true and false questions, definition questions, questions with 1 word answers
+                Questions and Answers should only take 1 line and alternate with a new line in between them. Do not number them.
+                Avoid mention that you got this infromation from notes, and 
+                DO NOT under any circumstance put a beginning sentence describe your task. Make it flow and sound human-like. """,
+            "history": conversation_history  # <-- Pass the current history
+        })
+    }
+
+    try:
+        # 3. Call the handler function
+        response = handler(mock_event, None)
+        
+        # 4. Parse the handler's response
+        response_body_data = json.loads(response.get("body", "{}"))
+        
+        if response.get("statusCode") == 200:
+            reply = response_body_data.get("reply", "No reply found.")
+            file = open("results/flashcards.txt", "w")
+            file.write(f"{reply}")
+            file.close()
+            output = {
+                "output" : f"{reply}"
+            }
+            json_output = json.dumps(output, indent=4)
+            print(json_output)
+            return json_output
+        else:
+            # Handle errors returned by the handler (like 429 or 500)
+            error = response_body_data.get("error", "Unknown error")
+            print(f"Error: {error} (Code: {response.get('statusCode')})")
+            
+            # Restore history from the error response (in case of a processing error)
+            conversation_history = response_body_data.get("history", conversation_history)
+    except Exception as e:
+        # This catches fatal errors in the main loop itself
+        print(f"\n--- An unexpected Python error occurred ---")
+        print(f"Error: {e}")
+
 
 
 def main():
@@ -337,11 +424,12 @@ def main():
     print(f"Using model: {MODEL_ID}")
     print("Type 'exit' or 'quit' to end.")
     print("-" * 28)
-    getSummary("results/notes.txt")
-    getQuestions("results/notes.txt", 3)
-    file = open("results/questions.txt", "r")
-    question = file.read().splitlines()
-    file.close()
-    checkAnswer("results/notes.txt", question[0], "I don't know the answer to this one, can you explain it to me?")
+    #getSummary("results/englishNotes.txt")
+    #getQuestions("results/YouDreamedOfEmpires.pdf", 3)
+    getFlashCards("results/notes.txt", 10)
+    #file = open("results/questions.txt", "r")
+    #question = file.read().splitlines()
+    #file.close()
+    #checkAnswer("results/YouDreamedOfEmpires.pdf", question[0], "I don't know the answer to this one, can you explain it to me?")
 if __name__ == "__main__":
     main()

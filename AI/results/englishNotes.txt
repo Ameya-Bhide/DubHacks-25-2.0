@@ -1,0 +1,258 @@
+An Introduction to Technological Communication
+Everything is influenced by technology, and all technology needs its well-written documentation.
+Technological information can be made accessible, usable, and relevant for everyone.
+Accessibility requires accuracy, clarity, completeness, concreteness, organization, and visual effectiveness.
+Usability requires finding the correct information as efficiently as possible, as is measured as such.
+Relevance requires the correct audience to get the correct information, and must take into account the technology used and the experience of the audience.
+Technological Communication is usually used amongst people under stressful situations.
+Examples include manuals that accompany a product, procedures that explain a task, instructions that are specific, quick reference cards for less common actions, reports that focus on specific topics, proposals that give recommendations and solutions, memos that encourage discussion, and emails that give quick information. 
+Different professions require different formats and mediums, including CD-ROM, Internet, E-text, online help, printed matter, and oral presentations.
+People who makes technical communication include technical writers and editors, web designers, online documentation specialists, information and instructional developers, and write for users of high technology.
+All technical professionals at some point need to technically communicate with other non-technical personal. 
+Major use of electronic technology and communication allow more easy access to communicating with other professionals and faster exchange of information.
+Good technical communication allows hard to understand scientifical topics become public knowledge.
+Technical information conveys important information, and ethically may require deciding between what is right and what makes money.
+Chapter 1: Introduction to Technological Communication
+Technical writing is unconsciously used everywhere, and now it is more important to learn it to succeed in today's world.
+technical writing is a broad term about specific communications about specialized topics.
+Technical writing became a major writing style around WWI with the growth of new technology in the hands of inexperienced people
+Technical writing targets a specific audience with a problem and clearly communicates how to solve it.
+It is rhetorical, persuasive, purposeful, problem-oriented, professional, design centered, research/technology oriented, and ethical.
+Your specific writing should be honest, clear, accurate, complete concise, and attractive, without any errors.
+Accessibility is the most important standard in writing.
+Writing must be legible and readable, so that readers can comprehend what they are reading.
+2.1 Business Correspondence and Resumes
+Common components:
+Headings should contain writer's address and date, no name.
+Inside address should contain name and address of the recipient, include appropriate title and company.
+Salutation should directly address the recipient, using either a colon or comma. Referring to a department or position name can dodge figuring a salutation.
+Block letter format:
+Subject/reference line announces the main business of the letter, with the salutation
+Body of the letter is just professional and technical writing
+Complimentary close should be respectful and not too wordy, only first word is capitalized, followed by a comma.
+Signature block includes typing your name 4 lines down, your signature in the new empty space, along with title/position below everything
+End notations: Initials of the writer, letter, or typist, listing other items enclosed in the envelope, and other copies with "cc"
+Following pages: longer than one page letters should have page number in the heading, make sure to use the same paper
+Business Letter Formats: block letter, semi-block letter, alternative block letter, or simplified letter, depending on your organization and situation. Use simplified if you don't know.
+Style in Business Correspondence, state the main business, purpose, or subject matter right away, if you are responding to a letter, identify that letter by its subject and date in the first paragraph, keep the paragraphs of most business letters short, compartmentalize the contents of your letter, provide topic indicators at the beginning of paragraphs, list or itemize whenever possible in a business letter, place important information strategically in business letters, find positive ways to express bad news in your business letters, focus on the recipient's needs instead of your own, avoid pompous phrasing, have an "action ending" whenever appropriate.
+Inquiry Letters: only for information that you cannot find but is not too much. Identify purpose early, identify yourself, list questions clearly, add some form of compensation in unsolicited letters, and express gratitude. 
+Complaint Letters: maintain poise and diplomacy, avoid making adversaries, identify reason, provide full details of the problem as evidence, state expected compensation, explain why it should be granted, and why it's the recipient's best interest to fulfill the grant.
+Adjustment Letters: reference the original letter and its purpose, express your concern, if denying, explain why in a noncombative tone and try to offer partial compensation, if granting, not in a begrudging tone, conclude with confidence.
+Job Application Letters (cover letters): with resume is a job package, is used to clear connection between thenjob and your qualifications, selectively presents resume information, then actual resume
+Common types: Objecitve letters identifies position, interest, resume, and other important information not on the resume, such as interview times. Highlight letters summarize key information presenting you as a good candidate, used for connecting specifically with the job.
+Common sections in Application letters: Introductory paragraph with purpose, source, one hook, and make it short. Main body presents your experience, education, training, and connects it with the job. Can be split by functions or themes, but best parts must come first. Remember it highlights not summarizes. Consider also adding your goals. Closing paragraph indicates how to schedule an interview with you and urge them to do so.
+Background details in the application letter: A boring letter makes readers skip the resume, select details that make you memorable.
+Early-Career Application Letters: With no experience, cite your projects, college courses/programs, volunteer work, organizations you belong to, and your interest.
+Checklist of Common Problems in Application Letters: Readability and white space, page fill, general neatness, proper use of format, direct indication of connection, positive tone, good introduction, good balance between brevity and details, specifics, minimum opinions, and correct grammer/spelling
+Resumes: your selective background, accompanied by cover letter, should be readable, effective, and adapted to audience.
+Resume design: resumes can be tailored to employer, every detail must start with you, your background, employer interests, employee goals, in your own words.
+Sections in Resumes: Heading, one third, name, phone numbers, address, details of your occupation/titles, can also have goals, objectives, and highlights. Body, more than half, present your work, eduction, experience, in reverse chronological order, accomplishments as well, split either functionally or thematically. Conclusion has other related information, references available on request, date, helps personalize you.
+Functional design resumes start with either eduction or experience, ends with skills, certification, and personal information. 
+Thematic designs split into categories with top categories being relevant for the jobs that they used in their job advertisment.
+Objective resumes gives information but no salesmanship, useful for thematic or summary/highlight section. very unclear.
+Detailed resumes including everything and responsibilities and statements and is preferred.
+Layout: headings are too the left, text is in center margins, lines are shorter, and use hanging-head margin, special typography for highlighting organization and job titles
+Detail formats:  Occupation, position, jobtitle, Company or organization name, time period, key details of accomplishments and responsibilities.
+Special sections: Highlights/summary section at the very top, where most people look, and list key qualifications. Objectives and goals is not recommended, amplification that go into more detail, projects, courses, volunteer, organizations.
+Resume Checklist: Readability, white space, special format, consistent margins, terse writing style, page fill, clarity of boundary lines between major sections, reverse chronological order, consistency of phrasing, consistency of punctuation style, translations for inside information, grammar/spelling, AND ONE PAGE ONLY.
+Genre as Social Action
+Genres can be categorized by audience, modes of thinking, discourse, and rhetorical situation.
+Genre criticism brings reductionism, rules, formalism, and is not good.
+Genre must be theoretically/critically useful, and must be rhetorically sound.
+Genre must be focused on the action it is used to accomplish.
+A classification of discourse must understand the discourse and its audience.
+If genre represents action, it must have situation and motive to understand human action.
+Dynamic fuses substantive, stylistic, and situational characteristics to form a genre.
+Genre is also about the relationship between the situation and discourse.
+Genres are also deliberative, forensic, and epideictic, and have characteristic substance.
+Genre is fully rhetorical at this point, signifying the connection between intention and effect.
+Genre is an open class with new and old members evolving and decaying. 
+Organizing principles only categorize methods of classifying discourse, motivational principles are better at distinguishing genres.
+Genre levels: distinguish rhetoric of discourse, classifies rhetoric, contain rhetorical forms, and terms of style.
+The 4 levels are too abstract, representing human nature more than rhetorical practice.
+Classes either do not represent rhetorical action or don't have open systems, focusing on formal elements instead of pragmatic ones.
+Genres should be discourse classification based in rhetorical practice and open and organize around situated pragmatic actions.
+Problems: rhetoric and context of situation should have a clarified relationship, and genres should fuse situational with formal and substantive features, and how generalized should a genre be?
+Rhetorical situation can be viewed through a motivated focus of situation, or an exigence one.
+Situation has a fundamental real part, and a perceptual screen. 
+Rhetorical situations in genre theory must recur, and we must reject the materialist tendencies in situational theory.
+Situations are social constructs not of perception but of definition.
+Human action is based on meaning, not by material cause, for the process of interpretation.
+When a new situation occurs, we try to typification it, and if we can't, we form a new type for it.
+Types are of human action and social understanding, as everyone must share common types.
+situation is not an inventory of ongoing sights and sounds but a semiotic structure.
+Children begin with limited understanding and language, and only speak in generalized situation types, as they learn more, the more situations they encounter and interact with.
+Exigence is the form of social knowledge, as rhetorical situation is a social construct.
+exigence could engage any of several particular intentions, such as why a party did anything at all.
+Exigence must be seen as a social motive, not as rhetorical action or intention.
+Motives are products of our socialization, and rarely primitive.
+Social action in human settled society, exists in the form of recurrent patterns of joint action.
+In instability, it is difficult to know other's motivation, and it's difficult to engage in discourse.
+Substance is the aspects of common experience that are being symbolized
+Form is the ways that substance is being symbolized
+Since context is hierarchical, form, substance, and context are relative
+Form is significant as it becomes an aspect of substance at a higher level.
+Three hierarchically structured constructs, context, episodes, and symbolic acts.
+Context is the form of life, the experience and events linguistic and nonlinguistic, and encounters, which particularize them.
+Episodes are rule conforming sequence of symbolic acts generated by two or more actors who are collectively oriented toward emergent goals.
+Symbolic acts are (non) verbal utterances which express intentionality.
+Conversations amongst participants required coherence and coordinated management of meanings, accomplished through rules.
+Hierarchical levels are connected by rules that coordinate cognitive movement.
+Genre is a classification of rhetorical discourses whose recurrent constitutive and regulative rules are similar in distinction and patterns
+Genres are in the level of complete discourses based on recurrent situations
+Motive then becomes a conventionalized social purpose, and in recurrent situations, exigence.
+Discourse must be dealt with purpose at several levels.
+In small audiences, more rules are needed in lower levels. In larger audiences, higher levels.
+Genres exist at different abstractions, but if we associate with recurrence of rhetorical situation, genre becomes easier to identify.
+Either categorize by single discourses to classes to classes OR constituents into units into large wholes (more rhetorically significant).
+Genre is a conventional category of discourse based on rhetorical action, it is interpretable by rules at different levels, is distinct from form, serves as substance of higher level forms, is a rhetorical means for mediating private intentions and social exigence.
+Discourse can fail to constitute a genre by not being significant in lower levels, inadequate consideration of all the elements in recurrent rhetorical situation, and if there is no pragmatic component.
+In the absence of a genre, the rules do not form a normative whole that we can consider a cultural artifact. It means that the interpreter must have a strong understanding of forms at both higher and lower levels in order to bridge the gap.
+Genres are a recurrent, significant action that embodies an aspect of cultural rationality. It can serve as both an index of cultural patterns and as tools for exploring the achievements of particular speakers and writers. It can also serve to understand how to participate in the actions of a community.
+Ethics in Technical Communication
+Technical communication must be done in an ethical fashion.
+We must take into consideration the needs and well-being of the audience.
+Just because something is legal doesn't make it ethical.
+four basic kinds of moral standards: Utility, rights, justice, and caring
+Utility is an inclusive term used to refer to the net benefits of any sort produced by an action
+Rights looks at individual entitlements to freedom of choice and well-being
+Justice looks at how the benefits and burdens are distributed among people
+the ethic of care is not to follow universal and impartial moral principles, but instead to attend respond to the good of particular concrete persons with whom we are in a valuable and close relationship.
+Do not hide or bury the information that there is a problem, make a clear recommendation to solve the problem. Make clear the perceived consequences if the problem is not dealt with.
+Ethical communication is clear and appropriately detailed as to prevent disasters.
+People do not want to be the bad guy, and might fudge data to keep things in order, but when safety is at stake, ethical communication is necessary.
+Appropriate Language in Technical Communication: Factual Correctness, Socially acceptable language, neutrality, transparency.
+Scientific citings must be communicated correctly and not dramatized.
+Copyright laws exist to protect a creator's creation. It can be waived, protected, or sold.
+Copyright doesn't protect facts, ideas, or descriptions, those can be used with proper citations.
+Copyright protects creative expression, such as designs, logos, pictures, icons, and other ways of expressing information.
+Using copyrighted material that you did not make without an agreement from the original creator is an infringement of copyright.
+Just because you can grab something from the internet doesn't mean that you can use it without fear of copyright.
+Libraries can make copies for loans and archiving, does not prohibit destroying or reselling books, does not prohibit educational uses, does not prohibit altering a work to provide for a disabled person.
+Fair use allows people to use parts of copyrighted work for certain circumstances without permission
+Students can use copyrighted material under educational use for restricted audience and must convey the message they want with proper citation.
+Not every piece has a trademark or copyright symbol.
+Infringements can and will be caught, whether it is from a small creator or large company.
+It is good manner to ask for permission and cite properly, it is also not that hard, and will prevent against infringing on copyrights.
+If an image is copyright free or in the creative commons, then you can use it.
+Cooking data is the practice of falsifying data (through creation or deletion of specific parts) in order to bolster your own argument. 
+Trimming data lessens the effect of statistical outliers, and must be disclaimed to readers. It is okay for data that is outside the realm of possibility, but should not be used to bolster your argument.
+Cherry picking data is the practice of only using data that supports your hypothesis.
+It is unethical to cook, trim, and cherry pick data.
+How does one translate an informative piece written to a certain audience, with a certain perspective, and a certain bias, for different readers?
+Managing Ethical Challenges
+Ethics are systems of moral, social, or cultural values that govern the conduct of an individual or community, simplified to "doing the right thing".
+Every decision has an ethical dimension, and resolving dilemmas is part of the job.
+People make unethically decisions because they feel like they are in a tough situation and fear failure.
+Personal ethics - values derived from family, culture, and faith
+Social ethics - values derived from constitutional, legal, utilitarian, and caring sources
+Conservation ethics - Values that protect and preserve the ecosystem in which we live
+Personal ethics deal with you, social ethics deal with others, conservation deals with your environment
+Social ethics: Rights (civil and constitutional), Justice (Laws and corporate policies), Utilitarianism (greatest good), Care (tolerance and compassion)
+Do not break the law (no matter the temptation)
+People often fight and miscategorize ethical issues, leading to more debate.
+rights > laws > utility > care, with some exceptions. 
+Many people in technical fields yield power to change the ecosystem, and it is important to have conservation ethics and learn about sustainability.
+Analyze the ethical dilemma especially from the 3 viewpoints and find the ethical tension where 2 or more stances are incompatible.
+Make a decision, check if any laws or rules govern it, if any corporate or professional codes of ethics offer guidance, if there are any historical records to learn from, check what colleagues think, and what would moral leaders do.
+React appropriately when you disagree with your employer, persuasion through costs and benefits, seek legal advice, mediation, memos to file, whistle-blowing or resigning in serious cases.
+Ethical situations should be carefully considered and never ignored.
+Ethics in the technical workplace, as we enter a new information age we need to update our ethics.
+Copyright law still applies even when it can be easily shared over the internet
+Trademarks are when people/companies claim a symbol, word, or phrase as their property.
+Trademarking with the US Patent and Trademark Office allows them to use the (tm) symbol after their trademark.
+Once registered, they have exclusive rights to their logo, word, or phrase.
+The first amendment protects speech and allows parodies or critiques of trademarked items.
+Patents are used to protect inventors from other people copying their unique invention.
+Privacy laws are still being debated over as more surveillance occurs in today's society
+Information sharing, such as databases of customers and employees that can be shared, including sensitive information, is still being discussed.
+Proprietary information is information an employee is not allowed to share outside of the company, it can be determined by a security clearance.
+Libel and slander are falsehoods and untruths that are used to damage the reputation or livelihood of another person or company. With the internet, it is far more dangerous, and can be subjected to legal action.
+Fraud is especially dangerous on the internet, where hiding malicious links is easier.
+Copyright law allows someone exclusive legal right to reproduce, publish, or sells their literary, musical, or artistic works.
+Someone's creative work is someone's property, and duplication or use of the work requires permission and possible pay.
+Copyrighted material can be reproduce for purposes of criticism, comment, news reporting, teaching, scholarship, or research. This is fair use.
+Streaming allows people to broadcast over the internet and produce creative work.
+Streaming, videos, blogs, and microblogs are all still under consideration of what counts as copyright. Your streaming and blogs can be protected by copyright law.
+Just because it is easier to steal doesn't make it acceptable.
+It is best to ask for permission from a copyright's owner in order to use their copyrighted material. As a student, you can use copyrighted material under fair use as long as it is limited use for education.
+As soon as it exists in written form, it is copyrighted. A (c) symbol can be added, but is not necessary.
+You can register with a US Copyright Office allows you to formally protect your work and helps define who owns the material.
+Plagiarism is the use of someone else's text or ideas as your own without giving credit, and is a violation of copyright law and it is academic dishonesty.
+Farka's Procedural Discourse
+Procedural discourse refers to written and spoken discourse that guides people in performing a task, a "how to" communications
+User Guides, repair manuals, booklets, online help systems, oral instructions.
+Procedural discourse exists because humans want to change things
+Procedural discourse describes the system states: desired state, prerequisite state, interim state, unwanted state, and the actions, human, system, and external, that change them
+The domain greatly influences the actions and states and the documentation
+Procedural discourse exists to guide others through a task, and is rhetorical in nature
+Must be attuned to a user's background, experience, and circumstance.
+Procedures must come from a trustworthy source who respects the user.
+a rhetorical aspect is selling the domain, so that users believe upon its whole enterprise
+dramatizes an implied persona author and an implied mock reader
+help systems are prevalent, an arena of innovation, and highly structured and terse construction.
+Components: title, conceptual element, infinitive subheading, steps, and notes
+Steps are brief statements and feedback
+Concomitant with the brevity of steps, the formatting is simple
+Action statements are built around an imperative verb.
+Use hypertexts when online.
+The streamlined=step model allows users to understand the procedure, especially well on a computer.
+Minimalism is complex and sophisticated user engagement, streamlined-step isn't.
+topic/module refers to individual units of content that are physically distinct and separate.
+title introduces the procedure, its topics and sets, can be noun phrases, gerund, root, or infinitive.
+Conceptual element consists of explanatory test that gives the user more information on the procedure, should announce goal and prerequisites.
+Infinitive subheading clusters related procedures under a single title/conceptual element
+Steps include: basic action steps, steps with a facilitating modifier, user option steps, conditional steps, purpose explanation in steps, feedback statements in steps.
+Notes identify content that appear outside the main flow of the procedures.
+The playscript procedure applies when more than one person does the procedure
+Flowchart procedure is good for when there are many conditions.
+Wizards has computers simplify both the procedure and the actions and performs some of the actions themselves.
+The interface annotation model, includes the balloon type pop-up messages, and is located close to controls of a human-engineered interface.
+Each model has their own rhetorical implications and possibilities.
+Rhetorical effects can keep users engaged, but creating an implied author is hard while trying to keep professionalism.
+Tutorials try to engage with timid users and give them confidence.
+Rich-step model is better for lengthy procedures
+Streamlined-step procedures are so familiar that they are expected from writers and users.
+Various models of procedural discourse have inherent rhetorical implications and make possible certain rhetorical strategies.
+
+Chapter 2: Applications of Technical Writing - 2.6: Instructions
+instructions are step-by-step explanations on how to do things, assemble, operate, repair, or maintain.
+Good instructions need: clear and concise writing, a thorough understanding, making your the audience, ability to visualize, and willingness to test your instructions.
+Determine the structure, define the audience and situation, write a description of your audience, determine the number of tasks.
+A simple procedure is one task, some of which can be turned into smaller, independent ones
+A complex procedure includes many semi-independent tasks
+A phase is a group of similar steps within a single-task procedure.
+Instructions can either focus on tasks or tools.
+Task approach requires writing about commonly used procedures and tasks
+Tools approach works upon more unlikely sections that a user may eventually need
+You must decide how to group tasks together for formatting
+Common Components: Title, Data, Table of Contents, Introduction, General Warning, caution, danger notices, Technical background/theory, Equipment and supplies, discussion of the steps, structure and format, supplementary discussions.
+Bold text can help distinguish between the actual action form the supplementary information.
+Writing style must be appropriate, never use a passive voice.
+Conclusion and other back matter ends the process neatly and offers troubleshooting, glossary, appendix, references, index, or specs.
+Graphics and visuals are crucial for instructions, as it allows visualization of them.
+They must be appropriate and placed in close proximity to the steps they illustrate.
+Remember to cite your sources
+Format of instructions: Headings, Lists, Special notes, Numbers, abbreviations, and symbols
+Good and correct instructions carries along ethical implications, poorly designed instructions lead to damage and loss of credibility/authority.
+Have them peer reviewed and tested if possible.
+
+Instructions: How to Write Guides for Busy, Grouchy People
+People who hate reading instructions will only glance at them when they need help
+Instructions should be organized, clear, and very, very brief
+Basics: Know your audience, brief introduction, write each step as a command, use numbers for commands, bullets for options, and plan to test / revise
+People read instructions when they are impatient, fatigued, or even terrified. Consider usability tests.
+The introduction should tell the user if it is worth their time , state in plain language the task, purpose, who should read it under what circumstances.
+Use the imperative mood for each step, answer by giving a direct command. Number steps to emphasize the sequence, possibilities can be bulleted.
+Divide instructions into discrete sections as readers may need only part of the instruction. Write brief introductions for each sections
+Plan, Test, and Revise your instructions. Create a prototype and conduct usability on it, use volunteers who represent the audience, and keep revising.
+
+
+
+
+
+
+
+
+
+

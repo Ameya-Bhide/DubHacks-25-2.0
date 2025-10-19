@@ -1,11 +1,9 @@
 No
 
-The main difference between perfect secrecy and computational security in symmetric-key cryptography is:
+The Legend of the Suns is a Nahua creation myth that was often invoked in Aztec political and religious discourse. In the context of the novel, the legend serves as a metaphor for Moctezuma's rule and the political turmoil surrounding it. 
 
-Perfect secrecy provides the strongest possible guarantee of security, where the ciphertext reveals no information about the plaintext, even with unlimited computational power. This is achieved by the one-time pad scheme, where the key is as long as the message and used only once. However, the requirement of a key as long as the message makes perfect secrecy impractical for most real-world applications.
+The ant in the legend represents Moctezuma - like the ant, he is silent and withdrawn, but ultimately holds the key to understanding the empire's fate. The cihuacoatl, Tlilpotonqui, is obsessed with deciphering the meaning of the ant metaphor, as it relates to Moctezuma's decision-making and his increasingly strained relationship with his longtime political ally.
 
-Computational security, on the other hand, aims to make breaking the encryption scheme computationally infeasible, even if the adversary has significant computational resources. This is achieved by using efficient block ciphers like AES, where the key is much shorter than the message. The security of these schemes is based on the assumption that certain computational problems are hard to solve, rather than the information-theoretic guarantees of perfect secrecy.
+Moctezuma's reliance on omens, visions, and hallucinogens to guide his rule has alienated many of his advisors and subjects. The cihuacoatl senses that Moctezuma is slipping away from him, and the ant metaphor represents Moctezuma's opaque and inscrutable thought process. Unraveling this metaphor becomes crucial for Tlilpotonqui as he tries to navigate the political crisis engulfing the Aztec empire.
 
-The trade-off is between the strength of the security guarantee and the practicality of the scheme. Perfect secrecy provides the strongest security, but is impractical due to the key size requirement. Computational security is more practical, but relies on unproven assumptions about the hardness of certain computational problems.
-
-In practice, computational security is the more widely used approach, as it allows for efficient and practical encryption schemes that can be used in a variety of applications. The security of these schemes is based on the best-known attacks, and they are designed to be secure against the most relevant threats. However, the security of computational schemes is not absolute, and they may become vulnerable to future advances in cryptanalysis or computing power.
+The Legend of the Suns thus serves as a symbolic framework for exploring the breakdown of Moctezuma's rule and the power dynamics between the emperor and his closest political confidant, the cihuacoatl. Understanding this mythological subtext is key to grasping the deeper significance of the political turmoil depicted in the novel.
