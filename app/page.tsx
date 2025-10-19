@@ -477,10 +477,23 @@ export default function Home() {
   }
 
   const handleDocumentFilterChange = (filterType: string, value: string) => {
-    setDocumentFilters(prev => ({
-      ...prev,
-      [filterType]: value
-    }))
+    setDocumentFilters(prev => {
+      const newFilters = {
+        ...prev,
+        [filterType]: value
+      }
+      
+      // If study group is selected, auto-fill the class name
+      if (filterType === 'studyGroup' && value) {
+        // Find the first document with this study group to get the class name
+        const matchingDoc = documents.find(doc => doc.studyGroupName === value)
+        if (matchingDoc && matchingDoc.className) {
+          newFilters.className = matchingDoc.className
+        }
+      }
+      
+      return newFilters
+    })
   }
 
   const clearFilters = () => {
@@ -1222,7 +1235,7 @@ export default function Home() {
     }
   }
 
-  const handleFilterChange = () => {
+  const handleStudyGroupFilterChange = () => {
     let filtered = allPublicGroups
 
     if (universityFilter) {
@@ -1954,7 +1967,7 @@ export default function Home() {
                       placeholder="e.g., CSE 142, MATH 124"
                       value={classNameFilter}
                       onChange={(e) => setClassNameFilter(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleFilterChange()}
+                      onKeyPress={(e) => e.key === 'Enter' && handleStudyGroupFilterChange()}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -1963,7 +1976,7 @@ export default function Home() {
                 {/* Search Button */}
                 <div className="flex items-center justify-between mb-6">
                   <button
-                    onClick={handleFilterChange}
+                    onClick={handleStudyGroupFilterChange}
                     className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-medium flex items-center"
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
