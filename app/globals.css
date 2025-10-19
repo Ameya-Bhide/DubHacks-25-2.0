@@ -2,26 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
-}
-
+/* Fix text visibility without breaking Tailwind */
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  color: #1f2937; /* gray-800 - dark text for light backgrounds */
+  background: #f9fafb; /* gray-50 - light background */
+}
+
+/* Only override form elements that might have visibility issues */
+input, textarea, select {
+  color: #1f2937;
+}
+
+/* Ensure form placeholders are visible */
+input::placeholder, textarea::placeholder {
+  color: #6b7280; /* gray-500 */
 }

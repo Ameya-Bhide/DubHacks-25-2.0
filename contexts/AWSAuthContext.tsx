@@ -16,13 +16,13 @@ interface User {
 interface AuthContextType {
   user: User | null
   loading: boolean
-  signIn: (username: string, password: string) => Promise<any>
-  signUp: (username: string, password: string, email: string) => Promise<any>
+  signIn: (email: string, password: string) => Promise<any>
+  signUp: (email: string, password: string, givenName: string, familyName: string) => Promise<any>
   signOut: () => Promise<void>
-  confirmSignUp: (username: string, code: string) => Promise<any>
-  resendSignUp: (username: string) => Promise<any>
-  forgotPassword: (username: string) => Promise<any>
-  forgotPasswordSubmit: (username: string, code: string, newPassword: string) => Promise<any>
+  confirmSignUp: (email: string, code: string) => Promise<any>
+  resendSignUp: (email: string) => Promise<any>
+  forgotPassword: (email: string) => Promise<any>
+  forgotPasswordSubmit: (email: string, code: string, newPassword: string) => Promise<any>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -36,42 +36,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkUser()
     
     // Listen for auth events
-    const unsubscribe = Hub.listen('auth', ({ payload: { event, data } }) => {
-      console.log('Auth event:', event, data)
-      switch (event) {
+    const unsubscribe = Hub.listen('auth', ({ payload }) => {
+      console.log('Auth event:', payload.event, payload)
+      switch (payload.event) {
         case 'signedIn':
-          setUser({
-            username: data.username,
-            email: data.signInDetails?.loginId || data.username,
-            attributes: {
-              email: data.signInDetails?.loginId || data.username,
-              email_verified: true
-            }
-          })
+          if ('data' in payload && payload.data) {
+            setUser({
+              username: (payload.data as any).username || (payload.data as any).userId,
+              email: (payload.data as any).signInDetails?.loginId || (payload.data as any).username || (payload.data as any).userId,
+              attributes: {
+                email: (payload.data as any).signInDetails?.loginId || (payload.data as any).username || (payload.data as any).userId,
+                email_verified: true
+              }
+            })
+          }
           break
         case 'signedOut':
           setUser(null)
           break
-        case 'signUp':
-          console.log('User signed up:', data)
-          break
         case 'signInWithRedirect':
-          console.log('Sign in with redirect:', data)
+          console.log('Sign in with redirect:', payload)
           break
         case 'signInWithRedirect_failure':
-          console.error('Sign in with redirect failed:', data)
-          break
-        case 'signUp_failure':
-          console.error('Sign up failed:', data)
-          break
-        case 'confirmSignUp_failure':
-          console.error('Confirm sign up failed:', data)
-          break
-        case 'resetPassword_failure':
-          console.error('Reset password failed:', data)
-          break
-        case 'confirmResetPassword_failure':
-          console.error('Confirm reset password failed:', data)
+          console.error('Sign in with redirect failed:', payload)
           break
         default:
           break
@@ -87,9 +74,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Current user:', user)
       setUser({
         username: user.username,
-        email: user.signInDetails?.loginId || user.username,
+        email: user.username, // Use username as email since we use email as username
         attributes: {
-          email: user.signInDetails?.loginId || user.username,
+          email: user.username,
           email_verified: true
         }
       })
@@ -101,20 +88,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const handleSignIn = async (username: string, password: string) => {
+  const handleSignIn = async (email: string, password: string) => {
     try {
       const result = await signIn({
-        username,
+        username: email,
         password,
       })
       console.log('Sign in result:', result)
       
       if (result.isSignedIn) {
         setUser({
-          username: result.username,
-          email: result.signInDetails?.loginId || result.username,
+          username: email,
+          email: email,
           attributes: {
-            email: result.signInDetails?.loginId || result.username,
+            email: email,
             email_verified: true
           }
         })
@@ -127,14 +114,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const handleSignUp = async (username: string, password: string, email: string) => {
+  const handleSignUp = async (email: string, password: string, givenName: string, familyName: string) => {
     try {
       const result = await signUp({
-        username,
+        username: email, // Use email as username
         password,
         options: {
           userAttributes: {
             email,
+            given_name: givenName,
+            family_name: familyName,
           },
         },
       })

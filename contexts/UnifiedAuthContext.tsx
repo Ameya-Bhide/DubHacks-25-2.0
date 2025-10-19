@@ -58,9 +58,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = await getCurrentUser()
         setUser({
           username: currentUser.username,
-          email: currentUser.signInDetails?.loginId || currentUser.username,
+          email: currentUser.username, // Use username as email since we use email as username
           attributes: {
-            email: currentUser.signInDetails?.loginId || currentUser.username,
+            email: currentUser.username,
             email_verified: true
           }
         })
@@ -69,18 +69,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Listen for auth events
-      const unsubscribe = Hub.listen('auth', ({ payload: { event, data } }) => {
-        console.log('Auth event:', event, data)
-        switch (event) {
+      const unsubscribe = Hub.listen('auth', ({ payload }) => {
+        console.log('Auth event:', payload.event, payload)
+        switch (payload.event) {
           case 'signedIn':
-            setUser({
-              username: data.username,
-              email: data.signInDetails?.loginId || data.username,
-              attributes: {
-                email: data.signInDetails?.loginId || data.username,
-                email_verified: true
-              }
-            })
+            if ('data' in payload && payload.data) {
+              setUser({
+                username: (payload.data as any).username || (payload.data as any).userId,
+                email: (payload.data as any).signInDetails?.loginId || (payload.data as any).username || (payload.data as any).userId,
+                attributes: {
+                  email: (payload.data as any).signInDetails?.loginId || (payload.data as any).username || (payload.data as any).userId,
+                  email_verified: true
+                }
+              })
+            }
             break
           case 'signedOut':
             setUser(null)
@@ -94,10 +96,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const result = await awsSignIn({ username: email, password })
           if (result.isSignedIn) {
             setUser({
-              username: result.username,
-              email: result.signInDetails?.loginId || result.username,
+              username: email,
+              email: email,
               attributes: {
-                email: result.signInDetails?.loginId || result.username,
+                email: email,
                 email_verified: true
               }
             })

@@ -49,7 +49,7 @@ export default function SignUpForm({ onSwitchToLogin, onSignUpSuccess }: SignUpF
 
     try {
       // Use email as username since email doubles as username
-      await signUp(formData.email, formData.password, formData.email, formData.givenName, formData.familyName)
+      await signUp(formData.email, formData.password, formData.givenName, formData.familyName)
       onSignUpSuccess(formData.email)
     } catch (error: any) {
       console.error('Sign up error:', error)
