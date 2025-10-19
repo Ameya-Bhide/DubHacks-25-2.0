@@ -1,0 +1,5 @@
+Explain the concept of perfect secrecy in symmetric-key cryptography and how it relates to the one-time pad scheme.
+
+What is the difference between the notions of a pseudorandom permutation (PRP) and a pseudorandom function (PRF) in the context of block ciphers? Discuss the relationship between these two concepts.
+
+Describe the AES-128 block cipher in terms of its structure and the security guarantees it provides. How does the practical performance of AES-128 compare to the theoretical security properties of an ideal block cipher?

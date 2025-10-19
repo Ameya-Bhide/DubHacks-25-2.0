@@ -1,0 +1,336 @@
+'use client'
+
+import React, { createContext, useContext, useEffect, useState } from 'react'
+import { hasRealAWSConfig } from '@/lib/aws-config'
+
+interface User {
+  username: string
+  email: string
+  attributes: {
+    email: string
+    email_verified: boolean
+  }
+}
+
+interface AuthContextType {
+  user: User | null
+  loading: boolean
+  isAWSMode: boolean
+  retryAWS: () => void
+  signIn: (email: string, password: string) => Promise<any>
+  signUp: (email: string, password: string, givenName: string, familyName: string, university: string, className: string) => Promise<any>
+  signOut: () => Promise<void>
+  confirmSignUp: (email: string, code: string) => Promise<any>
+  resendSignUp: (email: string) => Promise<any>
+  forgotPassword: (email: string) => Promise<any>
+  forgotPasswordSubmit: (email: string, code: string, newPassword: string) => Promise<any>
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isAWSMode, setIsAWSMode] = useState(false)
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      if (hasRealAWSConfig()) {
+        console.log('🔐 Using AWS authentication')
+        setIsAWSMode(true)
+        await initializeAWSAuth()
+      } else {
+        console.log('🛠️ Using development authentication')
+        setIsAWSMode(false)
+        setLoading(false)
+        initializeDevAuth()
+      }
+    }
+    
+    initializeAuth()
+  }, [])
+
+  const initializeAWSAuth = async () => {
+    try {
+      // Load AWS modules using the reliable loader
+      let awsAuthModule, awsUtilsModule
+      try {
+        // Dynamically import AWS modules only when needed
+        const { loadAWSModules } = await import('@/lib/aws-loader')
+        const modules = await loadAWSModules()
+        awsAuthModule = modules.auth
+        awsUtilsModule = modules.utils
+      } catch (loadError) {
+        console.warn('Failed to load AWS Amplify modules, falling back to dev mode:', loadError)
+        // Store the failure in localStorage to prevent repeated attempts
+        localStorage.setItem('aws-amplify-failed', 'true')
+        // Fall back to dev auth if AWS modules fail to load
+        setIsAWSMode(false)
+        initializeDevAuth()
+        return
+      }
+
+      const { signIn: awsSignIn, signUp: awsSignUp, signOut: awsSignOut, confirmSignUp: awsConfirmSignUp, resendSignUpCode, resetPassword, confirmResetPassword, getCurrentUser, fetchAuthSession } = awsAuthModule
+      const { Hub } = awsUtilsModule
+
+      // Clear the failure flag since AWS loaded successfully
+      localStorage.removeItem('aws-amplify-failed')
+
+      // Check if user is already signed in
+      try {
+        const currentUser = await getCurrentUser()
+        setUser({
+          username: currentUser.username,
+          email: currentUser.username, // Use username as email since we use email as username
+          attributes: {
+            email: currentUser.username,
+            email_verified: true
+          }
+        })
+      } catch (error) {
+        setUser(null)
+      }
+
+      // Listen for auth events
+      const unsubscribe = Hub.listen('auth', ({ payload }: { payload: any }) => {
+        console.log('Auth event:', payload.event, payload)
+        switch (payload.event) {
+          case 'signedIn':
+            if ('data' in payload && payload.data) {
+              setUser({
+                username: (payload.data as any).username || (payload.data as any).userId,
+                email: (payload.data as any).signInDetails?.loginId || (payload.data as any).username || (payload.data as any).userId,
+                attributes: {
+                  email: (payload.data as any).signInDetails?.loginId || (payload.data as any).username || (payload.data as any).userId,
+                  email_verified: true
+                }
+              })
+            }
+            break
+          case 'signedOut':
+            setUser(null)
+            break
+        }
+      })
+
+      // Store auth functions
+      setAuthFunctions({
+        signIn: async (email: string, password: string) => {
+          const result = await awsSignIn({ username: email, password })
+          if (result.isSignedIn) {
+            setUser({
+              username: email,
+              email: email,
+              attributes: {
+                email: email,
+                email_verified: true
+              }
+            })
+          }
+          return result
+        },
+        signUp: async (email: string, password: string, givenName: string, familyName: string, university: string, className: string) => {
+          // First, create the Cognito user
+          const cognitoResult = await awsSignUp({
+            username: email,
+            password,
+            options: { 
+              userAttributes: { 
+                email,
+                given_name: givenName,
+                family_name: familyName
+                // Note: We're not storing university/className in Cognito anymore
+                // They'll be stored in DynamoDB user profile instead
+              } 
+            }
+          })
+
+          // If signup was successful, create user profile in DynamoDB
+          if (cognitoResult && !cognitoResult.isSignUpComplete) {
+            try {
+              const { createUserProfile } = await import('@/lib/aws-user-profiles')
+              await createUserProfile({
+                userId: email, // Use email as user ID
+                email,
+                givenName,
+                familyName,
+                university,
+                className
+              })
+              console.log('✅ User profile created in DynamoDB')
+            } catch (profileError) {
+              console.error('❌ Failed to create user profile:', profileError)
+              // Don't fail the signup if profile creation fails
+              // The user can still complete signup and we can retry profile creation later
+            }
+          }
+
+          return cognitoResult
+        },
+        signOut: async () => {
+          await awsSignOut()
+          setUser(null)
+        },
+        confirmSignUp: async (email: string, code: string) => {
+          return await awsConfirmSignUp({ username: email, confirmationCode: code })
+        },
+        resendSignUp: async (email: string) => {
+          return await resendSignUpCode({ username: email })
+        },
+        forgotPassword: async (email: string) => {
+          return await resetPassword({ username: email })
+        },
+        forgotPasswordSubmit: async (email: string, code: string, newPassword: string) => {
+          return await confirmResetPassword({ username: email, confirmationCode: code, newPassword })
+        }
+      })
+
+      return () => unsubscribe()
+    } catch (error) {
+      console.error('Failed to initialize AWS auth:', error)
+      // Fallback to dev auth
+      setIsAWSMode(false)
+      initializeDevAuth()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const initializeDevAuth = async () => {
+    try {
+      // Check if user is in localStorage
+      if (typeof window !== 'undefined') {
+        const storedUser = localStorage.getItem('dev-user')
+        if (storedUser) {
+          const userData = JSON.parse(storedUser)
+          setUser({
+            username: userData.username,
+            email: userData.signInDetails?.loginId || userData.username,
+            attributes: {
+              email: userData.signInDetails?.loginId || userData.username,
+              email_verified: true
+            }
+          })
+        }
+      }
+
+      // Store dev auth functions
+      setAuthFunctions({
+        signIn: async (email: string, password: string) => {
+          if (email && password) {
+            const userData = {
+              username: email,
+              signInDetails: {
+                loginId: email
+              }
+            }
+            
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('dev-user', JSON.stringify(userData))
+            }
+            
+            setUser({
+              username: email,
+              email: userData.signInDetails.loginId,
+              attributes: {
+                email: userData.signInDetails.loginId,
+                email_verified: true
+              }
+            })
+            
+            return userData
+          }
+          throw new Error('Invalid credentials')
+        },
+        signUp: async (email: string, password: string, givenName: string, familyName: string, university: string, className: string) => {
+          // Create user profile in DynamoDB (dev mode uses localStorage)
+          try {
+            const { createUserProfile } = await import('@/lib/aws-user-profiles')
+            await createUserProfile({
+              userId: email,
+              email,
+              givenName,
+              familyName,
+              university,
+              className
+            })
+            console.log('✅ User profile created (dev mode)')
+          } catch (profileError) {
+            console.error('❌ Failed to create user profile:', profileError)
+          }
+          
+          return {
+            isSignUpComplete: false,
+            nextStep: {
+              signUpStep: 'CONFIRM_SIGN_UP',
+              codeDeliveryDetails: {
+                destination: email,
+                deliveryMedium: 'EMAIL',
+                attributeName: 'email'
+              }
+            }
+          }
+        },
+        signOut: async () => {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('dev-user')
+          }
+          setUser(null)
+        },
+        confirmSignUp: async (email: string, code: string) => {
+          return { isSignUpComplete: true }
+        },
+        resendSignUp: async (email: string) => {
+          return { isCodeDeliverySuccessful: true }
+        },
+        forgotPassword: async (email: string) => {
+          return { isCodeDeliverySuccessful: true }
+        },
+        forgotPasswordSubmit: async (email: string, code: string, newPassword: string) => {
+          return { isPasswordResetComplete: true }
+        }
+      })
+    } catch (error) {
+      console.error('Failed to initialize dev auth:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const [authFunctions, setAuthFunctions] = useState<Omit<AuthContextType, 'user' | 'loading' | 'isAWSMode' | 'retryAWS'>>({
+    signIn: async () => {},
+    signUp: async () => {},
+    signOut: async () => {},
+    confirmSignUp: async () => {},
+    resendSignUp: async () => {},
+    forgotPassword: async () => {},
+    forgotPasswordSubmit: async () => {}
+  })
+
+  const retryAWS = () => {
+    console.log('🔄 Retrying AWS authentication...')
+    localStorage.removeItem('aws-amplify-failed')
+    if (hasRealAWSConfig()) {
+      setIsAWSMode(true)
+      initializeAWSAuth()
+    }
+  }
+
+  const value = {
+    user,
+    loading,
+    isAWSMode,
+    retryAWS,
+    ...authFunctions
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
+}

@@ -1,0 +1,69 @@
+{
+  "name": "study-group-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "public/electron.js",
+  "homepage": "./",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "electron": "electron .",
+    "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "build-electron": "npm run build && electron-builder",
+    "dist": "npm run build && electron-builder --publish=never",
+    "check-aws": "node scripts/check-aws-config.js"
+  },
+  "dependencies": {
+    "@aws-amplify/ui-react": "^6.13.0",
+    "@aws-sdk/client-dynamodb": "^3.913.0",
+    "@aws-sdk/client-s3": "^3.913.0",
+    "@aws-sdk/lib-dynamodb": "^3.913.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/uuid": "^10.0.0",
+    "aws-amplify": "^6.15.7",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "js-yaml": "^4.1.0",
+    "next": "14.0.4",
+    "node-fetch": "^2.7.0",
+    "react": "^18",
+    "react-dom": "^18",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.0.1",
+    "concurrently": "^8.2.2",
+    "eslint": "^8",
+    "eslint-config-next": "14.0.4",
+    "postcss": "^8",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.studygroup.app",
+    "productName": "Study Group App",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "public/electron.js",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.education"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fix text visibility without breaking Tailwind */
+body {
+  color: #1f2937; /* gray-800 - dark text for light backgrounds */
+  background: #f9fafb; /* gray-50 - light background */
+}
+
+/* Only override form elements that might have visibility issues */
+input, textarea, select {
+  color: #1f2937;
+}
+
+/* Ensure form placeholders are visible */
+input::placeholder, textarea::placeholder {
+  color: #6b7280; /* gray-500 */
+}

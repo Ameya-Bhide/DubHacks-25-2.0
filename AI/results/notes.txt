@@ -1,0 +1,332 @@
+Symmetric/Secret-key cryptography: The sender and the receiver share a secret key and want to communicate securely in presence of an adversary who we assume not to know the key
+
+M -> A & K -> C -> E & B & K -> M
+
+Cryptographic schemes are a collection of algorithms meant to jointly achieve a particular cryptographic task.
+
+Specify algorithms using pseudocode/diagrams
+
+
+
+Var <$- {0,1}128
+Picks var uniformly at random from the set of all 128 bit = 16 byte strings.
+
+
+
+
+Symmetric encryption scheme is a triple of algorithms with:
+The randomized key generation takes no input and outputs a key K (KG)
+The encoder takes as inputs the key K and the plaintext M, and outputs a ciphertext C (Enc)
+The decoder is such that Dec(K, Enc(K,M)) = M for every plaintext M and key K output (Dec)
+Triangle represents key input
+K = key
+M = plaintext, usually {0, 1}n
+C = Cyphertext
+
+We will define syntax/correctness and security separately
+Syntax/correctness allows for trivial/uninteresting/insecure encryption schemes- and that's ok because we are not yet concerned about security
+An encryption scheme can satisfy several security properties at once, defining these security notions is more difficult, and this is what we are going to attempt next.
+
+Mono-alphabetic substitution - 26!
+Cesar cipher: Special ase where pi defines a shift,- 26
+
+Is it Secure?
+Ask:
+What does the adversary know? [C]
+What does the adversary want? [M]
+
+Kerckhoff's principle. An encryption scheme must be secure even if everything about the it, except the key, is public knowledge.
+NO SECURITY BY OBSCURITY!
+
+Ciphertext-only attack: The adversary only sees ciphertexts, and wants to recover any useful information about the plaintexts
+With partial information, context can be used to gather useful information, so all information must be secure!
+
+An attack is successful as long as it recovers some useful information about the plaintexts
+
+A secure encryption scheme should hide all possible useful information about the plaintexts
+
+Break =/= finding the key
+Be skeptical whenever the security arguments based on hardness to find the key, or (worse) # of keys!
+
+Good encryption must resist chosen-plaintext attacks
+
+Stronger attacks know more about the relations between plaintexts and cyphertexts
+
+Mono-alphabetic substitution, insecure against unknown plaintext attacks, due to statistical attacks.
+
+Theorem: Computational problem A is intractable => It is intractable to break [Security property] of Scheme B
+
+
+One-Time Pad:
+Kg():
+K <$- {0, 1} n
+Return k
+
+Message Space: M = {0,1}n
+Ciphertext Space: C = {0,1}n
+
+Enc(K, M):
+C <- M (+) K
+
+Dec(K, C):
+M <- C (+) K
+
+Using bitwise Xor has some interesting properties
+
+M (+) K (+) K = M
+K(+)K = 0
+M (+) 0 = M
+Commutative
+
+Our goal is to define security as the property that the adversary does not learn anything potentially useful from a cyphertext
+
+Claude Shannon: "Father of information theory"
+
+Information captured via distribution:
+message M is an English word
+Distribution: M <- set of all English words
+M is a vote
+Distribution: M is either Y or N
+
+Shannon Request:
+"Given some a-priori information about the plaintext, the adversary cannot learn any additional information about the plaintext by observing the ciphertext"
+
+Probability Notation:
+V <$- D
+Sampling a random variable V from a distribution D
+V <$- S
+Sampling a random variable V from a uniform set S
+Pr[Event A]
+Experiment
+The probability of Event A in a random Experiment
+Pr[Event A| Event B]
+Experiment
+Conditional Probability
+
+Shannon Secrecy:
+A symmetric encryption scheme (Kg, Enc, Dec) satisfies Shannon secrecy wrt distribution D over the plaintext space M if for all plaintexts M* in M and all ciphertexts C* in C
+
+Pr[M = M* | Enc(K, M) = C*] = Pr[M = M*]
+K <$- Kg, M <$- D                        M <$- D
+
+Satisfies Shannon Secrecy if it satisfies Shannon secrecy with to every distribution D over M.
+
+Perfect Secrecy:
+A symmetric encryption scheme (Kg, Enc, Dec) satisfies perfect secrecy if for all pairs of plaintexts M0, M1 in M, and all ciphertexts C in C,
+Pr [Enc(K, M0( = C] = Pr [Enc(K, M1) = C]
+K <$- Kg                        K <$- Kg
+Satisfies perfect secrecy if and only if it satisfies Shannon secrecy
+(Both notions imply that ciphertext distribution is independent from plaintext)
+
+Theorem: The one-time pad satisfies perfect secrecy
+
+
+Since C (+) M is known to be fixed, then K is fixed and a probability can be calculated
+
+IS OTP A good encryption scheme?
+How do we encrypt 2n bits without makes a longer key.
+Enc(K, M1, M2) = Enc(K1, M1)||(K, M2) = M1 (+) K || M2 (+) K
+
+Doesn't work! Xor both sides to get M1 (+) M2
+
+Extending the key to maintain security is not a good idea
+
+For every Pi with Perfect Secrecy, we have |M| <= |K|
+
+
+
+
+
+Perfect secrecy is not practical! We need as much key material as the data to be encrypted
+Paradigm shift
+Perfect Security: Mathematically impossible to break, But, inherently impractical schemes
+Computational security: Computationally hard to break, efficient and practical schemes
+
+Perfect secrecy for symmetric encryption gives the strongest possible guarantee, but it is impractical as we need as much key as plaintext.
+
+Block cyphers are the building block of computationally secure symmetric encryption
+
+Poly-alphabetic substitution, every permutation changes for each position, prevents frequency from being found.
+
+"super-poly-graphic" substitution
+Encrypt a block of characters at a time.
+
+Informal definition. A block cipher is a succinct representation of a substitution table for large blocks.
+Succinct means for 128 bit (16 byte) blocks
+Length of a random substitution table > 2^128
+Length of block cipher description = 128 bits
+
+
+
+
+If it is  invertible then it is a block cipher
+
+AES 128 is the standard and a building block cypher
+Outputs for distinct inputs are distinct, when using same key, but otherwise random looking
+
+Informal security requirement
+The behavior of a secure block cipher is "indistinguishable" from that of a randomly chosen substitution table
+Sample a random table from a permutation of Perm({0,1}^n)
+
+More convenient to think of the random substitution table as an "oracle" RP [n] which can be queried on input x to learn pi(x) for a uniformly chosen permutation.
+Takes 2^n time to sample the table
+
+Don't sample the entire table at initiation, sample T[X] on demand when X is queried, lazy sampling.
+
+Keyed Block Cipher, we want to compare block cipher use (with random key) with RP [n] To do , we introduce different oracle KF[E] "Keyed Function Oracle"
+For a good block cipher E, it should be hard to decide whether we are given access to KF[E] or RP[n]
+
+Introducer distinguisher who tries to figure out if we are in a "Real world" vs "ideal world"
+
+A block cipher is a function E: {0,1}K x {0,1}n -> {0,1}n
+
+For a good block cipher E< it should be hard to decide whether we are given access to an oracle KF[E] or block cipher RP[n]
+Distinguisher DO as an algorithm, in pseudocode, which can invoke public procedures from an oracle O (issuing queries)   also return a binary value
+
+Underlying random experiment:
+We initialize O, run Init
+Run D which makes calls to O
+In the end, D returns an output, either 0 or 1
+This is the probability that this output is 1.
+
+Definition
+
+Number between 0 - 1 represents how well it distinguished between 2 oracles
+
+
+Definition:
+
+
+PRP =  Pseudo-Random permutation
+Interpret: Think of D as an adversary, Measure how well D breaks E
+
+
+
+Because of the identity, distinguisher always returns 1,
+As N grows, the more accurate the distinguisher becomes
+
+Distribution of Y0 = Uniform over {0, 1}^n
+Distribution of Y1 = Uniform over {0,1}^n \ {Y0}
+
+
+
+Can be used to proof that multiple uses of the one-time pad is insecure
+
+
+
+For both E1 and E2 we have given very simple distinguishers with large prp advantage
+This means that both of them do not behave like a random permutation, and therefore, they are not good block ciphers!
+
+
+When is a block cipher E secure?
+Adv(D) is very small for all D ideally, however there is very large running time
+Next best thing: Adv(D) "very small" for all "feasible" D
+We say that E is a pseudorandom permutation
+
+For n = 128, we want D <= 2-80 
+We want D <= epsilon(k) for every D running in time at most t(k)
+Security is not a {0,1} property - things can be more or less secure
+
+Concrete security is used in applied cryptography
+Asymptotic security is used in theoretical cryptography
+
+Get familiarized with formalism
+Cryptography (and computer science) are about precision
+Formalism allows us to tame complexity, abstract recurring components, apply properties to them
+Example: Defining an object as a permutation allows us to use permutation properties
+
+
+
+
+AES-128 in detail
+M - > K0 -> subBytes, ShiftRows, MixColumns… 10 rounds total
+SubBytes: Apply S-box S to each byte
+ShiftRows and MixColumns (independent)
+
+Native AES support (AES-NI)
+Key expansion can be expensive
+
+Best Attack: 4*Brute Force
+
+Theoretically sound block ciphers/PRPs exist, but not as practical as AES.
+Issue: only encrypts short n-bit messages
+Use block cipher as substitution table (ECB mode)
+Can discover messages by knowing parts of the plaintexts.
+
+Semantic security: The ciphertexts leak nothing about the plaintexts, other than what we knew to start with.
+
+Randomization, stateful algorithm, nonces are used in semantic security
+IND-CPA security = Indistinguishability under a Chosen Plaintext Attack
+
+A symmetric encryption scheme satsifies perfect secrecy if for all pairs of messages, M0, M1, and all ciphertexts C,
+
+
+
+"If you give me two messages, and I encrypt one of them for you, you cannot tell which one I encrypted!"
+Extend to: Multiple encryptions. Adaptive choice of messages, Relaxing equality of distributions
+
+Say 2 oracles exist where one always does M0 and one always does M1, The distinguisher's advantage using IND-CPA is:
+
+Closer to 0 is better
+
+
+If PI is deterministic, then it is not IND-CPA secure.
+We need encryption schemes that are randomized
+
+It is infeasible to recover the key, the plaintext, detect whether plaintexts satisfy a certain given property.
+
+
+
+Every time we encrypt a new message, we expect a different R. If E is PRP, then the different R.s makes different E(K, R) makes different one-time pads! Unlikely to reuse R.
+
+
+
+If E is a pseudorandom permutation, then it is indistinguishable from a random permutation
+However: Random permutation are annoying to wkr with, as we prefer to think of block cipher outputs as uniform & truly independent, as opposed to "distinct"
+Must better abstraction: Random function
+
+
+
+
+
+We are going to show for a block cipher that PRF and PRP notions are basically equivalent as long as n is logarithmic
+Intuition: IF I  give you q n-bit values sampled Either uniformly with replacement or uniformly without replacement, you can hardly tell the difference if n is large enough.
+
+
+ 
+As long as no collision, RF [n, n] behaves as RP[n]
+They collide with probability at most q(q-1)/2^(n+1)
+IF q is polynomial in k, and n is logarithmic, this probability is negligible
+Hence, RF [n, n] and RP[ n] are indistinguishable .
+
+
+
+
+
+Corollary requires the n the big enough compared anything that grows larger than log k
+
+Negligible functions review those.
+T = poly(k) = p(n)
+then t^2/2^n is negligible
+
+For every distinguisher running in time t, they can only have an advantage of at most epsilon for this cipher.
+ 
+Triangle inequality:
+
+
+
+
+
+
+
+
+
+
+In general: This means that DO runs all instructions of the original D, but also manages an instance of O, therefore generally slower
+Buy in many cases, running time difference is immaterial, so they have the same running time t
+
+Reduction: We show that distinguishing two oracle O-3 and O-2 reduces to breaking the security of E as a PRF.
+
+
+
+
