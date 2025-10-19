@@ -37,10 +37,16 @@ export default function ConfirmSignUpForm({ email, onBackToLogin }: ConfirmSignU
     setResendLoading(true)
 
     try {
-      await resendSignUp(email)
+      console.log('🔄 Resending verification code to:', email)
+      const result = await resendSignUp(email)
+      console.log('✅ Resend successful:', result)
       setError('')
+      // Show success message
+      alert('Verification code has been resent to your email. Please check your inbox and spam folder.')
     } catch (error: any) {
-      console.error('Resend code error:', error)
+      console.error('❌ Resend code error:', error)
+      console.error('Error code:', error.code)
+      console.error('Error message:', error.message)
       setError(error.message || 'Failed to resend verification code')
     } finally {
       setResendLoading(false)

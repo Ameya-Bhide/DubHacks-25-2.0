@@ -49,10 +49,22 @@ export default function SignUpForm({ onSwitchToLogin, onSignUpSuccess }: SignUpF
 
     try {
       // Use email as username since email doubles as username
-      await signUp(formData.email, formData.password, formData.givenName, formData.familyName)
+      console.log('🚀 Starting signup process for:', formData.email)
+      const result = await signUp(formData.email, formData.password, formData.givenName, formData.familyName)
+      console.log('✅ Signup successful:', result)
+      
+      // Check if email verification is required
+      if (result.nextStep && result.nextStep.signUpStep === 'CONFIRM_SIGN_UP') {
+        console.log('📧 Email verification required')
+        console.log('📬 Email destination:', result.nextStep.codeDeliveryDetails?.destination)
+        console.log('📧 Delivery medium:', result.nextStep.codeDeliveryDetails?.deliveryMedium)
+      }
+      
       onSignUpSuccess(formData.email)
     } catch (error: any) {
-      console.error('Sign up error:', error)
+      console.error('❌ Sign up error:', error)
+      console.error('Error code:', error.code)
+      console.error('Error message:', error.message)
       setError(error.message || 'An error occurred during sign up')
     } finally {
       setLoading(false)
