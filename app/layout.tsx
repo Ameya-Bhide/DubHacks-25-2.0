@@ -7,7 +7,7 @@ import '@/lib/aws-config'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Study Group App',
+  title: 'Syntra',
   description: 'A collaborative study platform for students',
 }
 

@@ -1,5 +1,5 @@
 {
-  "name": "study-group-app",
+  "name": "syntra",
   "version": "0.1.0",
   "private": true,
   "main": "public/electron.js",

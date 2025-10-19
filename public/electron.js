@@ -24,8 +24,14 @@ function createWindow() {
   })
 
   // Load the app
+  const getDevUrl = () => {
+    // Try common Next.js development ports
+    const ports = [3000, 3001, 3002, 3003]
+    return `http://localhost:${ports[0]}` // Use port 3000 as shown in terminal
+  }
+  
   const startUrl = isDev 
-    ? 'http://localhost:3000' 
+    ? getDevUrl()
     : `file://${path.join(__dirname, '../out/index.html')}`
   
   console.log('Loading URL:', startUrl)
@@ -36,7 +42,7 @@ function createWindow() {
       // For development, wait a bit longer for the server to be ready
       if (isDev) {
         console.log('Waiting for Next.js development server to be ready...')
-        await new Promise(resolve => setTimeout(resolve, 3000))
+        await new Promise(resolve => setTimeout(resolve, 2000))
       }
       await mainWindow.loadURL(startUrl)
     } catch (error) {
@@ -136,13 +142,13 @@ app.whenReady().then(() => {
       label: 'Help',
       submenu: [
         {
-          label: 'About Study Group App',
+          label: 'About Syntra',
           click: () => {
             // Show about dialog
             require('electron').dialog.showMessageBox(mainWindow, {
               type: 'info',
-              title: 'About Study Group App',
-              message: 'Study Group App',
+              title: 'About Syntra',
+              message: 'Syntra',
               detail: 'A collaborative study platform for students\nVersion 1.0.0'
             })
           }

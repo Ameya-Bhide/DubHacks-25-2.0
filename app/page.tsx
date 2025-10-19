@@ -1305,7 +1305,7 @@ export default function Home() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Study Group</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Syntra</h1>
             <p className="text-gray-600">Connect, Learn, and Study Together</p>
           </div>
           
@@ -1432,7 +1432,7 @@ export default function Home() {
             {/* Logo and Navigation Tabs */}
             <div className="flex items-center space-x-8">
               <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-gray-900">Study Group</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Syntra</h1>
               </div>
               
               {/* Navigation Tabs */}
