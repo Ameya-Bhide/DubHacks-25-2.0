@@ -294,19 +294,12 @@ export default function Home() {
     if (!user) return
 
     try {
-      // For dev mode, we'll load invites based on user's email
-      // In a real app, this would be based on the logged-in user's email
+      // Always use AWS DynamoDB (no localStorage fallback)
       const userEmail = user.email || `${user.username}@example.com`
       
       console.log('Loading invites for user email:', userEmail)
       
-      // In Electron, always use localStorage
-      const isElectronEnv = isElectron()
-      if (isElectronEnv) {
-        console.log('🖥️ Electron Mode - Loading invites from localStorage')
-      }
-      
-      // Get all invites for the user using the appropriate data source (AWS or localStorage)
+      // Get all invites for the user from AWS DynamoDB
       const allUserInvites = await getInvitesForEmail(userEmail)
       console.log('Found invites for user:', allUserInvites)
       
@@ -314,6 +307,13 @@ export default function Home() {
       // The user can manually clean up outdated invites using the cleanup button
       console.log('All user invites (no filtering):', allUserInvites)
       setInvites(allUserInvites)
+      
+      const isElectronEnv = isElectron()
+      if (isElectronEnv) {
+        console.log('🖥️ Electron Mode - Data loaded from AWS DynamoDB')
+      } else {
+        console.log('🔗 Browser Mode - Data loaded from AWS DynamoDB')
+      }
     } catch (error) {
       console.error('Error loading invites:', error)
     }
@@ -336,21 +336,20 @@ export default function Home() {
 
     setDocumentsLoading(true)
     try {
-      // In Electron, skip document loading since API routes don't work
-      const isElectronEnv = isElectron()
-      if (isElectronEnv) {
-        console.log('🖥️ Electron Mode - Skipping document loading (API routes not available)')
-        setDocuments([])
-        setDocumentsLoading(false)
-        return
-      }
-      
+      // Always use API routes (works in both browser and Electron)
       const response = await fetch(`/api/ai-helper-files?userId=${user.username}&action=getUserFiles`)
       const result = await response.json()
       
       if (result.success) {
         setDocuments(result.files)
         console.log('📄 Documents loaded from .ai_helper:', result.files)
+        
+        const isElectronEnv = isElectron()
+        if (isElectronEnv) {
+          console.log('🖥️ Electron Mode - Documents loaded from AWS')
+        } else {
+          console.log('🔗 Browser Mode - Documents loaded from AWS')
+        }
       } else {
         console.error('Error loading documents:', result.error)
       }
@@ -565,32 +564,20 @@ export default function Home() {
 
     if (confirm(confirmMessage)) {
       try {
-        // Update localStorage (dev mode)
-        const storedGroups = localStorage.getItem('dev-study-groups')
-        if (storedGroups) {
-          const groups = JSON.parse(storedGroups)
-          const groupIndex = groups.findIndex((g: StudyGroup) => g.id === group.id)
-          
-          if (groupIndex !== -1) {
-            if (group.memberCount === 1) {
-              // Delete the group if it's the last member
-              groups.splice(groupIndex, 1)
-              alert('You have left the group and it has been deleted.')
-            } else {
-              // Remove user from members list
-              groups[groupIndex].members = groups[groupIndex].members.filter((member: string) => member !== user.username)
-              groups[groupIndex].memberCount = groups[groupIndex].members.length
-              alert('You have successfully left the group.')
-            }
-            
-            localStorage.setItem('dev-study-groups', JSON.stringify(groups))
-            // Reload study groups
-            loadStudyGroups()
-            // Close the modal
-            setIsGroupDetailsOpen(false)
-            setSelectedGroupForDetails(null)
-          }
+        // Use AWS DynamoDB API
+        const result = await leaveStudyGroup(group.id, user.username)
+        
+        if (result.deleted) {
+          alert('You have left the group and it has been deleted.')
+        } else {
+          alert('You have successfully left the group.')
         }
+        
+        // Reload study groups
+        loadStudyGroups()
+        // Close the modal
+        setIsGroupDetailsOpen(false)
+        setSelectedGroupForDetails(null)
       } catch (error) {
         console.error('Error leaving study group:', error)
         alert('Failed to leave study group')
@@ -604,32 +591,8 @@ export default function Home() {
       return
     }
 
-    try {
-      // Update localStorage (dev mode)
-      const storedGroups = localStorage.getItem('dev-study-groups')
-      if (storedGroups) {
-        const groups = JSON.parse(storedGroups)
-        const groupIndex = groups.findIndex((g: StudyGroup) => g.id === group.id)
-        
-        if (groupIndex !== -1) {
-          // Toggle the public setting
-          groups[groupIndex].isPublic = !groups[groupIndex].isPublic
-          
-          localStorage.setItem('dev-study-groups', JSON.stringify(groups))
-          
-          // Update the selected group for details
-          setSelectedGroupForDetails(groups[groupIndex])
-          
-          // Reload study groups
-          loadStudyGroups()
-          
-          alert(`Group is now ${groups[groupIndex].isPublic ? 'public' : 'private'}.`)
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling public setting:', error)
-      alert('Failed to update group setting')
-    }
+    // TODO: Implement API endpoint for updating group settings
+    alert('Group settings update not yet implemented. This feature will be available soon.')
   }
 
   if (loading) {
@@ -1197,126 +1160,9 @@ export default function Home() {
               </svg>
             </button>
 
-            {/* Clear Dev Data Button (only show in dev mode) */}
-            {!hasRealAWSConfig() && studyGroups.length > 0 && (
-              <button 
-                onClick={() => {
-                  if (confirm('Clear all development data? This will remove all study groups and reset the app.')) {
-                    localStorage.removeItem('dev-study-groups')
-                    localStorage.removeItem('dev-user-profiles')
-                    localStorage.removeItem('dev-invites')
-                    setStudyGroups([])
-                    alert('Development data cleared! You can now create fresh study groups.')
-                  }
-                }}
-                className="fixed bottom-6 right-24 w-14 h-14 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50"
-                title="Clear Development Data"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            )}
 
-            {/* Clean Up Invites Button (only show in dev mode) */}
-            {!hasRealAWSConfig() && (
-              <button 
-                onClick={async () => {
-                  try {
-                    const { devInvites } = await import('@/lib/aws-study-groups')
-                    const removedCount = await devInvites.cleanupOutdatedInvites()
-                    
-                    if (removedCount > 0) {
-                      alert(`Cleaned up ${removedCount} outdated invites!`)
-                      // Reload invites to show updated list
-                      loadInvites()
-                    } else {
-                      alert('No outdated invites found!')
-                    }
-                  } catch (error) {
-                    console.error('Error cleaning up invites:', error)
-                    alert('Failed to clean up invites')
-                  }
-                }}
-                className="fixed bottom-6 right-40 w-14 h-14 bg-orange-600 text-white rounded-full shadow-lg hover:bg-orange-700 hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50"
-                title="Clean Up Outdated Invites"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            )}
 
-            {/* View All Invites Button (only show in dev mode) */}
-            {!hasRealAWSConfig() && (
-              <button 
-                onClick={async () => {
-                  try {
-                    const allInvites = await getAllInvites()
-                    
-                    console.log('All invites in system:', allInvites)
-                    
-                    if (allInvites.length === 0) {
-                      alert('No invites found in the system!')
-                    } else {
-                      const inviteList = allInvites.map(invite => 
-                        `• ${invite.groupName} → ${invite.inviteeEmail} (${invite.status})`
-                      ).join('\n')
-                      
-                      alert(`All invites in system (${allInvites.length}):\n\n${inviteList}`)
-                    }
-                  } catch (error) {
-                    console.error('Error viewing all invites:', error)
-                    alert('Failed to view all invites')
-                  }
-                }}
-                className="fixed bottom-6 right-56 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50"
-                title="View All Invites (Debug)"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              </button>
-            )}
 
-            {/* Test Invite Button (only show in dev mode) */}
-            {!hasRealAWSConfig() && studyGroups.length > 0 && (
-              <button 
-                onClick={async () => {
-                  try {
-                    const userEmail = user?.email || `${user?.username}@example.com`
-                    
-                    // Create a test invite for the current user
-                    const testInvite = {
-                      id: Date.now().toString(),
-                      groupId: studyGroups[0].id,
-                      groupName: studyGroups[0].name,
-                      inviterId: 'test-user',
-                      inviterName: 'Test User',
-                      inviteeEmail: userEmail,
-                      status: 'pending' as const,
-                      createdAt: new Date().toISOString()
-                    }
-                    
-                    await sendInvite(testInvite)
-                    alert(`Test invite created for ${userEmail} to join "${studyGroups[0].name}"!`)
-                    
-                    // Reload invites to show the new one
-                    loadInvites()
-                  } catch (error) {
-                    console.error('Error creating test invite:', error)
-                    alert('Failed to create test invite')
-                  }
-                }}
-                className="fixed bottom-6 right-72 w-14 h-14 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50"
-                title="Create Test Invite"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </button>
-            )}
           </div>
         )}
 
