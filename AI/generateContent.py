@@ -726,7 +726,19 @@ def getFlashCards(file_path: str, num: int):
         print(f"\n--- An unexpected Python error occurred ---")
         print(f"Error: {e}")
 
-
+def query(query):
+    parameters = query.splitlines()
+    if(parameters[0] == "getSummary"):
+        return (getSummary(parameters[1]))
+    if(parameters[0] == "getQuestions"):
+        return (getQuestions(parameters[1], parameters[2]))
+    if(parameters[0] == "getFlashCards"):
+        return (getFlashCards(parameters[1], parameters[2]))
+    if(parameters[0] == "checkAnswer"):
+        return (checkAnswer(parameters[1], parameters[2], parameters[3]))
+    if(parameters[0] == "search"):
+        seperator = "\n"
+        return (seperator.join(search(parameters[1])))
 
 def main():
     try:

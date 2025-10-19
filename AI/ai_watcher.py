@@ -1,13 +1,13 @@
 import os
 import time
+import generateContent
+
 
 QUERY_FILE = "user_ai_query.txt"
 RESPONSE_FILE = "user_ai_response.txt"
 
 def run_ai(query: str) -> str:
-    """Placeholder for your AI logic."""
-    # Replace this with your actual AI model call
-    return f"The answer to '{query}' is definitely 42."
+    return generateContent.query(query)
 
 def main():
     print("🤖 AI Engine started. Watching for queries...")
