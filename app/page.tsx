@@ -24,6 +24,9 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false)
+  const [showEmailSentModal, setShowEmailSentModal] = useState(false)
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('')
   const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([])
   const [invites, setInvites] = useState<any[]>([])
   const [showInvites, setShowInvites] = useState(false)
@@ -254,6 +257,31 @@ export default function Home() {
     }
   }
 
+  const handleForgotPassword = async (email: string) => {
+    try {
+      // Simulate sending email - in a real app, this would call your backend API
+      console.log('Sending password reset email to:', email)
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Show success modal
+      setShowForgotPasswordModal(false)
+      setShowEmailSentModal(true)
+      setForgotPasswordEmail(email)
+      
+    } catch (error) {
+      console.error('Error sending password reset email:', error)
+      alert('Failed to send password reset email. Please try again.')
+    }
+  }
+
+  const handleBackToLogin = () => {
+    setShowEmailSentModal(false)
+    setForgotPasswordEmail('')
+    setAuthView('login')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -277,7 +305,7 @@ export default function Home() {
           {authView === 'login' && (
             <LoginForm
               onSwitchToSignUp={() => setAuthView('signup')}
-              onSwitchToForgotPassword={() => setAuthView('forgot')}
+              onSwitchToForgotPassword={() => setShowForgotPasswordModal(true)}
             />
           )}
           
@@ -293,6 +321,95 @@ export default function Home() {
             email={confirmEmail}
             onBackToLogin={() => setAuthView('login')}
           />
+        )}
+
+        {/* Forgot Password Modal */}
+        {showForgotPasswordModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Reset Password</h3>
+                <button
+                  onClick={() => setShowForgotPasswordModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition duration-200"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-gray-600 mb-4">
+                  Enter your email address and we'll send you a link to reset your password.
+                </p>
+                
+                <form onSubmit={(e) => {
+                  e.preventDefault()
+                  const formData = new FormData(e.target as HTMLFormElement)
+                  const email = formData.get('email') as string
+                  handleForgotPassword(email)
+                }} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter your email address"
+                    />
+                  </div>
+
+                  <div className="flex space-x-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPasswordModal(false)}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
+                    >
+                      Send Reset Link
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Email Sent Confirmation Modal */}
+        {showEmailSentModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Email Sent!</h3>
+                <p className="text-gray-600 mb-6">
+                  We've sent a password reset link to <strong>{forgotPasswordEmail}</strong>. 
+                  Please check your email and follow the instructions to reset your password.
+                </p>
+                
+                <button
+                  onClick={handleBackToLogin}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
+                >
+                  Back to Login
+                </button>
+              </div>
+            </div>
+          </div>
         )}
         </div>
       </div>
@@ -977,12 +1094,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* Create Group Modal */}
-      <CreateGroupModal
-        isOpen={isCreateGroupOpen}
-        onClose={() => setIsCreateGroupOpen(false)}
-        onCreateGroup={handleCreateGroup}
-      />
+       {/* Create Group Modal */}
+       <CreateGroupModal
+         isOpen={isCreateGroupOpen}
+         onClose={() => setIsCreateGroupOpen(false)}
+         onCreateGroup={handleCreateGroup}
+       />
     </div>
   )
 }
