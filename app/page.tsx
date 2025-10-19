@@ -12,6 +12,7 @@ export default function Home() {
   const [authView, setAuthView] = useState<AuthView>('login')
   const [confirmEmail, setConfirmEmail] = useState('')
   const [activeTab, setActiveTab] = useState('home')
+  const [showUploadModal, setShowUploadModal] = useState(false)
   const { user, loading, signOut } = useAuth()
 
   const handleLogout = async () => {
@@ -25,6 +26,21 @@ export default function Home() {
   const handleSignUpSuccess = (email: string) => {
     setConfirmEmail(email)
     setAuthView('confirm')
+  }
+
+  const handleUploadSubmit = (formData: any) => {
+    const jsonData = {
+      "File path": formData.filePath,
+      "Date Created": formData.date,
+      "Study Group Name": formData.studyGroupName,
+      "Class Name": formData.className,
+      "Name of file": formData.fileName,
+      "1-sentence description": formData.description
+    }
+    
+    console.log('Upload form data:', jsonData)
+    setShowUploadModal(false)
+    // Here you can add logic to actually upload the file or send the data to a server
   }
 
   if (loading) {
@@ -327,7 +343,10 @@ export default function Home() {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents Yet</h3>
               <p className="text-gray-600 mb-6">Upload and organize your study materials, notes, and resources.</p>
-              <button className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition duration-200">
+              <button 
+                onClick={() => setShowUploadModal(true)}
+                className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition duration-200"
+              >
                 Upload Documents
               </button>
             </div>
@@ -353,6 +372,134 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {/* Upload Documents Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Upload Document</h3>
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition duration-200"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault()
+              const formData = new FormData(e.target as HTMLFormElement)
+              const data = {
+                filePath: formData.get('filePath') as string,
+                date: formData.get('date') as string,
+                studyGroupName: formData.get('studyGroupName') as string,
+                className: formData.get('className') as string,
+                fileName: formData.get('fileName') as string,
+                description: formData.get('description') as string
+              }
+              handleUploadSubmit(data)
+            }} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Path to file:
+                </label>
+                <input
+                  type="text"
+                  name="filePath"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter file path"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date (enter as MM-DD-YY):
+                </label>
+                <input
+                  type="text"
+                  name="date"
+                  required
+                  pattern="\d{2}-\d{2}-\d{2}"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="MM-DD-YY"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Study Group Name:
+                </label>
+                <input
+                  type="text"
+                  name="studyGroupName"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter study group name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Class Name:
+                </label>
+                <input
+                  type="text"
+                  name="className"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter class name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Name of file:
+                </label>
+                <input
+                  type="text"
+                  name="fileName"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter file name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  1-sentence description:
+                </label>
+                <textarea
+                  name="description"
+                  required
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter a brief description"
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
+                >
+                  Submit
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
