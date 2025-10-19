@@ -69,8 +69,8 @@ export default function StudyGroupPage({ params }: StudyGroupPageProps) {
         if (isAWS) {
           result = await leaveStudyGroup(group.id, user.username)
         } else {
-          const group = await devStudyGroups.leaveStudyGroup(group.id, user.username)
-          result = { group, deleted: false }
+          const updatedGroup = await devStudyGroups.leaveStudyGroup(group.id, user.username)
+          result = { group: updatedGroup, deleted: false }
         }
         
         // Show appropriate message

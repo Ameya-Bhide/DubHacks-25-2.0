@@ -8,6 +8,9 @@ import SignUpForm from '@/components/SignUpForm'
 import ConfirmSignUpForm from '@/components/ConfirmSignUpForm'
 import CreateGroupModal from '@/components/CreateGroupModal'
 import InviteCard from '@/components/InviteCard'
+import FileNotifications from '@/components/FileNotifications'
+import DocumentCard from '@/components/DocumentCard'
+import OpenFileModal from '@/components/OpenFileModal'
 import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup } from '@/lib/aws-study-groups'
 import { hasRealAWSConfig } from '@/lib/aws-config'
 import { getUserProfile, UserProfile } from '@/lib/aws-user-profiles'
@@ -31,7 +34,10 @@ export default function Home() {
   const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([])
   const [invites, setInvites] = useState<any[]>([])
   const [showInvites, setShowInvites] = useState(false)
+  const [showFileNotifications, setShowFileNotifications] = useState(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [documents, setDocuments] = useState<any[]>([])
+  const [documentsLoading, setDocumentsLoading] = useState(false)
   const { user, loading, signOut, isAWSMode, retryAWS } = useAuth()
 
   // Handle URL tab parameter
@@ -55,40 +61,117 @@ export default function Home() {
     setAuthView('confirm')
   }
 
-  const handleUploadSubmit = async (formData: any) => {
-    const jsonData = {
-      "File path": formData.filePath,
-      "Date Created": formData.date,
-      "Study Group Name": formData.studyGroupName,
-      "Class Name": formData.className,
-      "Name of file": formData.fileName,
-      "1-sentence description": formData.description
-    }
-    
-    console.log('Upload form data:', jsonData)
+  const handleUploadSubmit = async (formData: any, file: File) => {
+    console.log('Upload form data:', formData)
+    console.log('Selected file:', file)
     
     try {
-      // Call the API endpoint to process the document
-      const response = await fetch('/api/process-document', {
+      // First, upload the file locally to get the actual file path
+      const localUploadFormData = new FormData()
+      localUploadFormData.append('file', file)
+      localUploadFormData.append('fileName', formData.fileName)
+      localUploadFormData.append('studyGroupName', formData.studyGroupName)
+      localUploadFormData.append('description', formData.description)
+      localUploadFormData.append('dateCreated', formData.date)
+      localUploadFormData.append('className', formData.className)
+      localUploadFormData.append('uploadedBy', user?.username || 'unknown-user')
+      
+      // The API will automatically check common locations and preserve existing file paths
+
+      // Upload file to local filesystem
+      const localUploadResponse = await fetch('/api/upload-local-file', {
+        method: 'POST',
+        body: localUploadFormData
+      })
+      
+      const localUploadResult = await localUploadResponse.json()
+      
+      if (!localUploadResult.success) {
+        console.error('Error uploading file locally:', localUploadResult.error)
+        alert(`Failed to upload file: ${localUploadResult.error}`)
+        return
+      }
+
+      const fileRecord = localUploadResult.fileRecord
+      console.log('File uploaded locally with actual path:', fileRecord.filePath)
+
+      // Save file record to .ai_helper system (for local storage)
+      const saveResponse = await fetch('/api/ai-helper-files', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(jsonData)
+        body: JSON.stringify({
+          action: 'saveFileRecord',
+          data: fileRecord
+        })
       })
       
-      const result = await response.json()
+      const saveResult = await saveResponse.json()
       
-      if (result.success) {
-        console.log('Document processed successfully:', result)
-        alert('Document processed successfully!')
+      if (saveResult.success) {
+        console.log('File record saved to .ai_helper successfully:', saveResult)
+        
+        // If it's a study group file (not personal), also save to DynamoDB for notifications
+        if (formData.studyGroupName !== 'Personal') {
+          // Create FormData for S3 upload
+          const uploadFormData = new FormData()
+          uploadFormData.append('file', file)
+          uploadFormData.append('studyGroupName', formData.studyGroupName)
+          uploadFormData.append('fileName', formData.fileName)
+          uploadFormData.append('description', formData.description)
+          uploadFormData.append('dateCreated', formData.date)
+          uploadFormData.append('className', formData.className)
+          uploadFormData.append('uploadedBy', user?.username || 'unknown-user')
+
+          // Upload file to S3
+          const uploadResponse = await fetch('/api/upload-file', {
+            method: 'POST',
+            body: uploadFormData
+          })
+          
+          const uploadResult = await uploadResponse.json()
+          
+          if (uploadResult.success) {
+            // Save file record to DynamoDB and notify study group members
+            const dbResponse = await fetch('/api/study-group-files', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'saveFileRecord',
+                data: { fileRecord: uploadResult.fileRecord }
+              })
+            })
+            
+            const dbResult = await dbResponse.json()
+            
+            if (dbResult.success) {
+              console.log('File uploaded to S3 and shared with study group members:', dbResult)
+              alert(`File uploaded successfully and shared with ${formData.studyGroupName} members!`)
+            } else {
+              console.error('Error saving to DynamoDB:', dbResult.error)
+              alert(`File saved locally but failed to share with group: ${dbResult.error}`)
+            }
+          } else {
+            console.error('Error uploading to S3:', uploadResult.error)
+            alert(`File saved locally but failed to upload to S3: ${uploadResult.error}`)
+          }
+        } else {
+          // Personal file - only saved locally
+          alert('File uploaded successfully!')
+        }
+        
+        // Refresh the documents list
+        loadDocuments()
       } else {
-        console.error('Error processing document:', result.error)
-        alert(`Error: ${result.error}`)
+        console.error('Error saving file record:', saveResult.error)
+        alert(`Failed to save file record: ${saveResult.error}`)
       }
     } catch (error) {
-      console.error('Error calling process-document API:', error)
-      alert('Failed to process document. Please try again.')
+      console.error('Error in upload process:', error)
+      alert('Failed to upload file. Please try again.')
     }
     
     setShowUploadModal(false)
@@ -167,12 +250,13 @@ export default function Home() {
     return !(year === 2026 && month === 11) // Can't go after December 2026
   }
 
-  // Load study groups, invites, and user profile when user is authenticated
+  // Load study groups, invites, user profile, and documents when user is authenticated
   useEffect(() => {
     if (user) {
       loadStudyGroups()
       loadInvites()
       loadUserProfile()
+      loadDocuments()
     }
   }, [user])
 
@@ -232,6 +316,103 @@ export default function Home() {
       console.log('📋 User profile loaded:', profile)
     } catch (error) {
       console.error('Error loading user profile:', error)
+    }
+  }
+
+  const loadDocuments = async () => {
+    if (!user) return
+
+    setDocumentsLoading(true)
+    try {
+      const response = await fetch(`/api/ai-helper-files?userId=${user.username}&action=getUserFiles`)
+      const result = await response.json()
+      
+      if (result.success) {
+        setDocuments(result.files)
+        console.log('📄 Documents loaded from .ai_helper:', result.files)
+      } else {
+        console.error('Error loading documents:', result.error)
+      }
+    } catch (error) {
+      console.error('Error loading documents:', error)
+    } finally {
+      setDocumentsLoading(false)
+    }
+  }
+
+  const [showOpenModal, setShowOpenModal] = useState(false)
+  const [pendingOpen, setPendingOpen] = useState<{
+    filePath: string
+    fileName: string
+  } | null>(null)
+
+  const handleDocumentOpen = (filePath: string, fileName: string) => {
+    // Set up the pending open and show the modal
+    setPendingOpen({ filePath, fileName })
+    setShowOpenModal(true)
+  }
+
+  const handleOpenConfirm = async (application: string) => {
+    if (!pendingOpen) return
+
+    const { filePath, fileName } = pendingOpen
+
+    try {
+      // Try to open the file using the selected application
+      const response = await fetch('/api/open-file', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filePath: filePath,
+          application: application
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // Show a brief success message
+        const appName = application === 'default' ? 'default application' : application
+        alert(`✅ Opening "${fileName}" with ${appName}`)
+      } else {
+        // Show error message with file path
+        alert(`❌ Failed to open file: ${result.error}\n\nFile location: ${filePath}\n\nYou can try:\n1. Opening your file explorer\n2. Navigating to the path above\n3. Double-clicking the file`)
+      }
+    } catch (error) {
+      console.error('Error opening document:', error)
+      // Fallback: show the path and instructions
+      alert(`❌ Error opening file\n\nFile location: ${filePath}\n\nYou can try:\n1. Opening your file explorer\n2. Navigating to the path above\n3. Double-clicking the file`)
+    } finally {
+      setShowOpenModal(false)
+      setPendingOpen(null)
+    }
+  }
+
+  const handleDocumentDelete = async (fileId: string, filePath: string) => {
+    try {
+      const response = await fetch('/api/ai-helper-files', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ filePath })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // Remove from local state
+        setDocuments(prev => prev.filter(doc => doc.id !== fileId))
+        alert('Document deleted successfully!')
+      } else {
+        console.error('Error deleting document:', result.error)
+        alert(`Error deleting document: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error deleting document:', error)
+      alert('Failed to delete document. Please try again.')
     }
   }
 
@@ -842,22 +1023,82 @@ export default function Home() {
         {/* Documents Tab Content */}
         {activeTab === 'documents' && (
           <div className="bg-white rounded-xl shadow-sm p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Documents</h2>
-            <div className="text-center py-12">
-              <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Documents</h2>
+              <div className="flex items-center space-x-3">
+                <button 
+                  onClick={() => setShowFileNotifications(true)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-medium flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4 19h6v-6H4v6zM4 5h6V1H4v4zM15 3h5l-5-5v5z" />
+                  </svg>
+                  File Notifications
+                </button>
+                <button 
+                  onClick={() => setShowUploadModal(true)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-200 font-medium flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Upload Documents
+                </button>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents Yet</h3>
-              <p className="text-gray-600 mb-6">Upload and organize your study materials, notes, and resources.</p>
-              <button 
-                onClick={() => setShowUploadModal(true)}
-                className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition duration-200"
-              >
-                Upload Documents
-              </button>
             </div>
+
+            {/* Documents List */}
+            {documentsLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading documents...</p>
+              </div>
+            ) : documents.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents Yet</h3>
+                <p className="text-gray-600 mb-6">Upload and organize your study materials, notes, and resources.</p>
+                <button 
+                  onClick={() => setShowUploadModal(true)}
+                  className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition duration-200"
+                >
+                  Upload Documents
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm text-gray-600">
+                    {documents.length} document{documents.length !== 1 ? 's' : ''} found
+                  </p>
+                  <button
+                    onClick={loadDocuments}
+                    className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                  </button>
+                </div>
+                
+                <div className="grid gap-4">
+                  {documents.map((document) => (
+                    <DocumentCard
+                      key={document.id}
+                      document={document}
+                      onOpen={handleDocumentOpen}
+                      onDelete={handleDocumentDelete}
+                      currentUserId={user?.username || ''}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -962,18 +1203,24 @@ export default function Home() {
               const formData = new FormData(e.target as HTMLFormElement)
               const fileInput = formData.get('filePath') as File
               
-              // Get the file path from the selected file
-              const filePath = fileInput ? fileInput.name : ''
+              if (!fileInput) {
+                alert('Please select a file to upload')
+                return
+              }
+              
+              // Convert date from YYYY-MM-DD to MM-DD-YYYY format
+              const dateValue = formData.get('date') as string
+              const dateParts = dateValue.split('-')
+              const formattedDate = `${dateParts[1]}-${dateParts[2]}-${dateParts[0]}`
               
               const data = {
-                filePath: filePath,
-                date: formData.get('date') as string,
+                date: formattedDate,
                 studyGroupName: formData.get('studyGroupName') as string,
                 className: formData.get('className') as string,
                 fileName: formData.get('fileName') as string,
                 description: formData.get('description') as string
               }
-              handleUploadSubmit(data)
+              handleUploadSubmit(data, fileInput)
             }} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -991,15 +1238,14 @@ export default function Home() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date (enter as MM-DD-YYYY):
+                  Date Created:
                 </label>
                 <input
-                  type="text"
+                  type="date"
                   name="date"
                   required
-                  pattern="\d{2}-\d{2}-\d{4}"
+                  defaultValue={new Date().toISOString().split('T')[0]}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="MM-DD-YYYY"
                 />
               </div>
 
@@ -1154,6 +1400,26 @@ export default function Home() {
           university: userProfile.university,
           className: userProfile.className
         } : undefined}
+      />
+
+      {/* File Notifications Modal */}
+      <FileNotifications
+        userId={user?.username || ''}
+        isOpen={showFileNotifications}
+        onClose={() => setShowFileNotifications(false)}
+        onFileDownloaded={loadDocuments}
+      />
+
+      {/* Open File Modal */}
+      <OpenFileModal
+        isOpen={showOpenModal}
+        fileName={pendingOpen?.fileName || ''}
+        filePath={pendingOpen?.filePath || ''}
+        onClose={() => {
+          setShowOpenModal(false)
+          setPendingOpen(null)
+        }}
+        onOpen={handleOpenConfirm}
       />
     </div>
   )
