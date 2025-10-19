@@ -1,0 +1,9 @@
+Symmetric/secret-key cryptography is a fundamental concept in the field of cryptography, where the sender and receiver share a secret key to communicate securely in the presence of an adversary. The key generation, encryption, and decryption algorithms are crucial components of a symmetric encryption scheme. Cryptographic schemes are designed to achieve specific cryptographic tasks, and their security is evaluated based on various security properties.
+
+One of the most important security properties is Shannon secrecy, which ensures that the adversary cannot learn any additional information about the plaintext by observing the ciphertext. Perfect secrecy, a stronger notion, requires that the ciphertext distribution is independent of the plaintext distribution. While the one-time pad satisfies perfect secrecy, it is impractical due to the requirement of a key as long as the plaintext.
+
+Computational security, a more practical approach, relies on the computational hardness of breaking the encryption scheme. Block ciphers, such as AES-128, are the building blocks of computationally secure symmetric encryption. The security of a block cipher is measured by its indistinguishability from a random permutation, known as a pseudorandom permutation (PRP).
+
+Semantic security, or indistinguishability under chosen-plaintext attacks (IND-CPA), is a crucial security property that ensures the ciphertexts do not leak any information about the plaintexts, beyond what is already known. Achieving IND-CPA security requires the use of randomization or stateful algorithms, as deterministic encryption schemes are not IND-CPA secure.
+
+The equivalence between the PRP and pseudorandom function (PRF) notions is an important result, as it allows for the use of block ciphers as PRFs, which are more convenient to work with. This equivalence holds as long as the block size

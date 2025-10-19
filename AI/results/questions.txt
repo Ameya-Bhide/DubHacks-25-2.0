@@ -1,0 +1,5 @@
+What is the main difference between perfect secrecy and computational security in symmetric-key cryptography? Discuss the trade-offs between these two approaches and their practical implications.
+
+Explain the concept of a pseudorandom permutation (PRP) and its relationship to the security of block ciphers. How can the PRP notion be used to analyze the security of a block cipher like AES-128?
+
+Describe the role of randomization and nonces in achieving semantic security for symmetric-key encryption schemes. How does the IND-CPA security definition capture the idea of ciphertexts not leaking any additional information about the plaintexts?

@@ -1,0 +1,11 @@
+No
+
+The main difference between perfect secrecy and computational security in symmetric-key cryptography is:
+
+Perfect secrecy provides the strongest possible guarantee of security, where the ciphertext reveals no information about the plaintext, even with unlimited computational power. This is achieved by the one-time pad scheme, where the key is as long as the message and used only once. However, the requirement of a key as long as the message makes perfect secrecy impractical for most real-world applications.
+
+Computational security, on the other hand, aims to make breaking the encryption scheme computationally infeasible, even if the adversary has significant computational resources. This is achieved by using efficient block ciphers like AES, where the key is much shorter than the message. The security of these schemes is based on the assumption that certain computational problems are hard to solve, rather than the information-theoretic guarantees of perfect secrecy.
+
+The trade-off is between the strength of the security guarantee and the practicality of the scheme. Perfect secrecy provides the strongest security, but is impractical due to the key size requirement. Computational security is more practical, but relies on unproven assumptions about the hardness of certain computational problems.
+
+In practice, computational security is the more widely used approach, as it allows for efficient and practical encryption schemes that can be used in a variety of applications. The security of these schemes is based on the best-known attacks, and they are designed to be secure against the most relevant threats. However, the security of computational schemes is not absolute, and they may become vulnerable to future advances in cryptanalysis or computing power.
