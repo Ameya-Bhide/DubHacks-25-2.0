@@ -1,0 +1,39 @@
+What is the goal of a symmetric/secret-key cryptography scheme?
+
+The sender and receiver share a secret key to communicate securely in the presence of an adversary.
+
+What are the three algorithms that make up a symmetric encryption scheme?
+
+Key generation, encryption, and decryption.
+
+What is the purpose of Kerckhoff's principle in cryptography?
+
+Kerckhoff's principle states that an encryption scheme must be secure even if everything about it, except the key, is public knowledge.
+
+True or false: The one-time pad satisfies perfect secrecy.
+
+True.
+
+What is the informal security requirement for a secure block cipher?
+
+The behavior of a secure block cipher should be "indistinguishable" from that of a randomly chosen substitution table.
+
+What does it mean for a block cipher to be a pseudorandom permutation (PRP)?
+
+It means that the block cipher is computationally indistinguishable from a truly random permutation.
+
+What is the goal of IND-CPA (indistinguishability under chosen-plaintext attack) security?
+
+The goal is to ensure that ciphertexts leak nothing about the plaintexts, other than what was known beforehand.
+
+What is the relationship between pseudorandom functions (PRFs) and pseudorandom permutations (PRPs)?
+
+For block ciphers with large enough block sizes, the notions of PRF and PRP are essentially equivalent.
+
+What is the purpose of randomization in symmetric encryption schemes?
+
+Randomization is used to achieve semantic security, where ciphertexts do not leak any information about the plaintexts.
+
+What is the main advantage of AES-128 over other theoretically sound block ciphers?
+
+AES-128 is a highly practical and efficient block cipher, with native hardware support in many
