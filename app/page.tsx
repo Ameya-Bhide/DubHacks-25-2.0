@@ -14,6 +14,9 @@ import FileNotifications from '@/components/FileNotifications'
 import DocumentCard from '@/components/DocumentCard'
 import OpenFileModal from '@/components/OpenFileModal'
 import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup, devMeetings, Meeting, getInvitesForEmail, getAllInvites, respondToInvite, deleteInvite, sendInvite, getAllStudyGroups, joinStudyGroup } from '@/lib/aws-study-groups'
+
+// Extended meeting type with group name
+type MeetingWithGroupName = Meeting & { groupName: string }
 import { hasRealAWSConfig, checkDynamoDBConfigFromBrowser, isElectron } from '@/lib/aws-config'
 import { getUserProfile, UserProfile } from '@/lib/aws-user-profiles'
 
@@ -38,6 +41,7 @@ export default function Home() {
   const [selectedGroupForDetails, setSelectedGroupForDetails] = useState<StudyGroup | null>(null)
   const [isGroupDetailsOpen, setIsGroupDetailsOpen] = useState(false)
   const [groupMeetings, setGroupMeetings] = useState<Meeting[]>([])
+  const [upcomingMeetings, setUpcomingMeetings] = useState<MeetingWithGroupName[]>([])
   const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([])
   const [invites, setInvites] = useState<any[]>([])
   const [showInvites, setShowInvites] = useState(false)
@@ -47,6 +51,12 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [documents, setDocuments] = useState<any[]>([])
   const [documentsLoading, setDocumentsLoading] = useState(false)
+  const [showFindGroups, setShowFindGroups] = useState(false)
+  const [allPublicGroups, setAllPublicGroups] = useState<StudyGroup[]>([])
+  const [filteredGroups, setFilteredGroups] = useState<StudyGroup[]>([])
+  const [universityFilter, setUniversityFilter] = useState('')
+  const [classNameFilter, setClassNameFilter] = useState('')
+  const [findGroupsLoading, setFindGroupsLoading] = useState(false)
   const { user, loading, signOut, isAWSMode, retryAWS } = useAuth()
 
   // Handle URL tab parameter
@@ -277,6 +287,9 @@ export default function Home() {
       const groups = await getUserStudyGroups(user.username)
       setStudyGroups(groups)
       
+      // Load upcoming meetings after study groups are loaded
+      await loadUpcomingMeetings(groups)
+      
       // Debug: Log all groups to console
       console.log('📊 All Study Groups:', groups)
       const isElectronEnv = isElectron()
@@ -357,6 +370,59 @@ export default function Home() {
       console.error('Error loading documents:', error)
     } finally {
       setDocumentsLoading(false)
+    }
+  }
+
+  const loadUpcomingMeetings = async (groups?: StudyGroup[]) => {
+    const groupsToUse = groups || studyGroups
+    console.log('🔍 Loading upcoming meetings...', { user: !!user, groupsCount: groupsToUse.length })
+    
+    if (!user || groupsToUse.length === 0) {
+      console.log('❌ No user or groups, skipping upcoming meetings load')
+      return
+    }
+
+    try {
+      const allMeetings: MeetingWithGroupName[] = []
+      
+      // Get meetings from all study groups
+      for (const group of groupsToUse) {
+        console.log(`📅 Getting meetings for group: ${group.name} (${group.id})`)
+        const meetings = await devMeetings.getMeetingsForGroup(group.id)
+        console.log(`📅 Found ${meetings.length} meetings for group ${group.name}`)
+        
+        // Add group name to each meeting
+        const meetingsWithGroupName = meetings.map(meeting => ({
+          ...meeting,
+          groupName: group.name
+        }))
+        allMeetings.push(...meetingsWithGroupName)
+      }
+      
+      console.log(`📅 Total meetings found: ${allMeetings.length}`)
+      
+      // Filter for upcoming meetings and sort by date
+      const now = new Date()
+      console.log('🕐 Current time:', now.toISOString())
+      
+      const upcoming = allMeetings
+        .filter(meeting => {
+          const meetingDate = new Date(`${meeting.date}T${meeting.time}`)
+          const isUpcoming = meetingDate > now
+          console.log(`📅 Meeting "${meeting.title}" on ${meeting.date} at ${meeting.time} - ${isUpcoming ? 'UPCOMING' : 'PAST'}`)
+          return isUpcoming
+        })
+        .sort((a, b) => {
+          const dateA = new Date(`${a.date}T${a.time}`)
+          const dateB = new Date(`${b.date}T${b.time}`)
+          return dateA.getTime() - dateB.getTime()
+        })
+        .slice(0, 3) // Get only the 3 closest
+      
+      console.log(`📅 Upcoming meetings to display: ${upcoming.length}`)
+      setUpcomingMeetings(upcoming)
+    } catch (error) {
+      console.error('Error loading upcoming meetings:', error)
     }
   }
 
@@ -454,7 +520,7 @@ export default function Home() {
       
       // Reload study groups to show the new membership if accepted
       if (response === 'accept') {
-        loadStudyGroups()
+          loadStudyGroups()
       }
       
       alert(`Invite ${response}ed successfully!`)
@@ -525,6 +591,9 @@ export default function Home() {
         setGroupMeetings(meetings)
       }
       
+      // Refresh upcoming meetings
+      await loadUpcomingMeetings()
+      
       alert(`Meeting "${meetingData.title}" scheduled for ${meetingData.date} at ${meetingData.time}`)
     } catch (error) {
       console.error('Error scheduling meeting:', error)
@@ -568,16 +637,16 @@ export default function Home() {
         const result = await leaveStudyGroup(group.id, user.username)
         
         if (result.deleted) {
-          alert('You have left the group and it has been deleted.')
-        } else {
-          alert('You have successfully left the group.')
-        }
-        
-        // Reload study groups
-        loadStudyGroups()
-        // Close the modal
-        setIsGroupDetailsOpen(false)
-        setSelectedGroupForDetails(null)
+              alert('You have left the group and it has been deleted.')
+            } else {
+              alert('You have successfully left the group.')
+            }
+            
+            // Reload study groups
+            loadStudyGroups()
+            // Close the modal
+            setIsGroupDetailsOpen(false)
+            setSelectedGroupForDetails(null)
       } catch (error) {
         console.error('Error leaving study group:', error)
         alert('Failed to leave study group')
@@ -594,6 +663,90 @@ export default function Home() {
     // TODO: Implement API endpoint for updating group settings
     alert('Group settings update not yet implemented. This feature will be available soon.')
   }
+
+  const loadPublicGroups = async () => {
+    if (!user) return
+
+    setFindGroupsLoading(true)
+    try {
+      // Load all public study groups
+      const allGroups = await getAllStudyGroups()
+      const publicGroups = allGroups.filter(group => group.isPublic)
+      setAllPublicGroups(publicGroups)
+      setFilteredGroups(publicGroups)
+    } catch (error) {
+      console.error('Error loading public groups:', error)
+      alert('Failed to load public groups')
+    } finally {
+      setFindGroupsLoading(false)
+    }
+  }
+
+  const handleFindGroupsToggle = () => {
+    setShowFindGroups(!showFindGroups)
+    if (!showFindGroups && allPublicGroups.length === 0) {
+      loadPublicGroups()
+    } else if (!showFindGroups) {
+      // Reset filters when opening Find Groups
+      setUniversityFilter('')
+      setClassNameFilter('')
+      setFilteredGroups(allPublicGroups)
+    }
+  }
+
+  const handleFilterChange = () => {
+    let filtered = allPublicGroups
+
+    if (universityFilter) {
+      filtered = filtered.filter(group => 
+        group.university === universityFilter
+      )
+    }
+
+    if (classNameFilter) {
+      filtered = filtered.filter(group => 
+        group.className.toLowerCase().includes(classNameFilter.toLowerCase())
+      )
+    }
+
+    setFilteredGroups(filtered)
+  }
+
+  const handleJoinPublicGroup = async (group: StudyGroup) => {
+    if (!user) return
+
+    // Check if user is already a member
+    if (group.members.includes(user.username)) {
+      alert('You are already a member of this group!')
+      return
+    }
+
+    // Check if group is full
+    if (group.memberCount >= group.maxMembers) {
+      alert('This group is full and cannot accept new members.')
+      return
+    }
+
+    const confirmMessage = `Are you sure you want to join "${group.name}"?`
+    if (confirm(confirmMessage)) {
+      try {
+        await joinStudyGroup(group.id, user.username)
+        alert('Successfully joined the group!')
+        
+        // Reload both user groups and public groups
+        loadStudyGroups()
+        loadPublicGroups()
+    } catch (error) {
+        console.error('Error joining group:', error)
+        alert('Failed to join group. Please try again.')
+      }
+    }
+  }
+
+  // Update filtered groups when allPublicGroups change (initial load)
+  useEffect(() => {
+    setFilteredGroups(allPublicGroups)
+  }, [allPublicGroups])
 
   if (loading) {
     return (
@@ -895,8 +1048,20 @@ export default function Home() {
             {/* Study Groups */}
             <div className="lg:col-span-2">
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">My Study Groups</h2>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">My Study Groups</h2>
+                  <button 
+                    onClick={() => setIsCreateGroupOpen(true)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-medium flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Create Group
+                  </button>
+                </div>
                 
+                {studyGroups.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                     <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -905,44 +1070,163 @@ export default function Home() {
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No Study Groups Yet</h3>
                   <p className="text-gray-600 mb-6">Start your learning journey by creating or joining a study group.</p>
+                    <button 
+                      onClick={() => setIsCreateGroupOpen(true)}
+                      className="bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition duration-200"
+                    >
+                      Create Your First Group
+                    </button>
                 </div>
-                
-                <button className="mt-6 w-full bg-primary-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-primary-700 transition duration-200">
-                  Create New Study Group
+                ) : (
+                  <div className="space-y-4">
+                    {studyGroups.slice(0, 3).map(group => (
+                      <div 
+                        key={group.id} 
+                        onClick={() => handleStudyGroupClick(group)}
+                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <h3 className="text-lg font-semibold text-gray-900">{group.name}</h3>
+                              {group.isPublic && (
+                                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                                  Public
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-gray-600 text-sm mb-3">{group.description}</p>
+                            <div className="flex items-center space-x-4 text-sm text-gray-500">
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                {group.memberCount}/{group.maxMembers} members
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                {group.university}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                </svg>
+                                {group.className}
+                              </span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                group.subject === 'Computer Science' ? 'bg-blue-100 text-blue-800' :
+                                group.subject === 'Data Science' ? 'bg-green-100 text-green-800' :
+                                group.subject === 'Mathematics' ? 'bg-purple-100 text-purple-800' :
+                                group.subject === 'Physics' ? 'bg-red-100 text-red-800' :
+                                group.subject === 'Chemistry' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {group.subject}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <span className="text-xs text-gray-500">
+                              {group.createdBy === user?.username ? 'Creator' : 'Member'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {studyGroups.length > 3 && (
+                      <div className="text-center pt-4">
+                        <button 
+                          onClick={() => setActiveTab('study-group')}
+                          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                        >
+                          View All {studyGroups.length} Groups →
                 </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {/* Upcoming Sessions */}
+              {/* Upcoming Dates */}
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Sessions</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Dates</h3>
+                {console.log('🎯 Rendering upcoming meetings:', upcomingMeetings.length, upcomingMeetings)}
+                {upcomingMeetings.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
                     <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <p className="text-gray-600 text-sm">No upcoming sessions</p>
+                    <p className="text-gray-600 text-sm">No upcoming meetings</p>
                 </div>
+                ) : (
+                  <div className="space-y-3">
+                    {upcomingMeetings.map(meeting => (
+                      <div key={meeting.id} className="border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm">{meeting.title}</h4>
+                            <p className="text-xs text-gray-600 mt-1">{meeting.groupName}</p>
+                            <div className="flex items-center space-x-2 mt-2 text-xs text-gray-500">
+                              <span className="flex items-center">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                {new Date(meeting.date).toLocaleDateString()}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {meeting.time}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                {meeting.meetingType === 'in-person' ? 'In-Person' : 'Online'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Quick Actions */}
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
                 <div className="space-y-3">
-                  <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200">
-                    <div className="font-medium text-gray-900">Join Study Session</div>
-                    <div className="text-sm text-gray-600">Find active sessions</div>
+                  <button 
+                    onClick={() => setActiveTab('study-group')}
+                    className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200"
+                  >
+                    <div className="font-medium text-gray-900">Find Study Groups</div>
+                    <div className="text-sm text-gray-600">Discover and join public groups</div>
                   </button>
-                  <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200">
+                  <button 
+                    onClick={() => setActiveTab('documents')}
+                    className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200"
+                  >
                     <div className="font-medium text-gray-900">Share Notes</div>
                     <div className="text-sm text-gray-600">Upload study materials</div>
                   </button>
-                  <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200">
-                    <div className="font-medium text-gray-900">Schedule Meeting</div>
-                    <div className="text-sm text-gray-600">Plan group study time</div>
+                  <button 
+                    onClick={() => setIsCreateGroupOpen(true)}
+                    className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition duration-200"
+                  >
+                    <div className="font-medium text-gray-900">Create Group</div>
+                    <div className="text-sm text-gray-600">Start your own study group</div>
                   </button>
                 </div>
               </div>
@@ -964,8 +1248,8 @@ export default function Home() {
                   <div className="mx-auto w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mb-4">
                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                  </div>
+                </svg>
+              </div>
                   <h3 className="text-xl font-semibold mb-2">Flashcards</h3>
                   <p className="text-blue-100 text-sm">Generate AI-powered flashcards from your study materials</p>
                 </div>
@@ -1025,7 +1309,14 @@ export default function Home() {
                     <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">{invites.length}</span>
                   )}
                 </button>
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-medium flex items-center">
+                <button 
+                  onClick={handleFindGroupsToggle}
+                  className={`px-4 py-2 rounded-lg transition duration-200 font-medium flex items-center ${
+                    showFindGroups 
+                      ? 'bg-blue-700 text-white' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
@@ -1055,6 +1346,196 @@ export default function Home() {
                         invite={invite}
                         onRespond={handleInviteResponse}
                       />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Find Groups Section */}
+            {showFindGroups && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900">Find Public Study Groups</h3>
+                  <button
+                    onClick={() => loadPublicGroups()}
+                    disabled={findGroupsLoading}
+                    className="text-blue-600 hover:text-blue-700 text-sm font-medium disabled:opacity-50"
+                  >
+                    {findGroupsLoading ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
+
+                {/* Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label htmlFor="university-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                      Filter by University
+                    </label>
+                    <select
+                      id="university-filter"
+                      value={universityFilter}
+                      onChange={(e) => setUniversityFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">All Universities</option>
+                      <option value="University of Washington">University of Washington</option>
+                      <option value="University of California, Berkeley">University of California, Berkeley</option>
+                      <option value="Stanford University">Stanford University</option>
+                      <option value="University of California, Los Angeles">University of California, Los Angeles</option>
+                      <option value="University of California, San Diego">University of California, San Diego</option>
+                      <option value="University of Southern California">University of Southern California</option>
+                      <option value="California Institute of Technology">California Institute of Technology</option>
+                      <option value="University of California, Davis">University of California, Davis</option>
+                      <option value="University of California, Irvine">University of California, Irvine</option>
+                      <option value="University of California, Santa Barbara">University of California, Santa Barbara</option>
+                      <option value="University of California, Santa Cruz">University of California, Santa Cruz</option>
+                      <option value="University of California, Riverside">University of California, Riverside</option>
+                      <option value="University of California, Merced">University of California, Merced</option>
+                      <option value="University of Oregon">University of Oregon</option>
+                      <option value="Oregon State University">Oregon State University</option>
+                      <option value="Portland State University">Portland State University</option>
+                      <option value="University of British Columbia">University of British Columbia</option>
+                      <option value="Simon Fraser University">Simon Fraser University</option>
+                      <option value="University of Victoria">University of Victoria</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="class-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                      Filter by Class Name
+                    </label>
+                    <input
+                      id="class-filter"
+                      type="text"
+                      placeholder="e.g., CSE 142, MATH 124"
+                      value={classNameFilter}
+                      onChange={(e) => setClassNameFilter(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleFilterChange()}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Search Button */}
+                <div className="flex items-center justify-between mb-6">
+                  <button
+                    onClick={handleFilterChange}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-medium flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Search Groups
+                  </button>
+                  <button
+                    onClick={() => {
+                      setUniversityFilter('')
+                      setClassNameFilter('')
+                      setFilteredGroups(allPublicGroups)
+                    }}
+                    className="text-gray-600 hover:text-gray-800 text-sm font-medium"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+
+                {/* Results */}
+                {findGroupsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Loading public groups...</p>
+                  </div>
+                ) : filteredGroups.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-600">
+                      {allPublicGroups.length === 0 
+                        ? 'No public study groups found. Be the first to create one!'
+                        : 'No groups match your current filters. Try adjusting your search criteria.'
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600 mb-4">
+                      Showing {filteredGroups.length} of {allPublicGroups.length} public groups
+                    </p>
+                    {filteredGroups.map(group => (
+                      <div 
+                        key={group.id} 
+                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <h4 className="text-lg font-semibold text-gray-900">{group.name}</h4>
+                              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                                Public
+                              </span>
+                            </div>
+                            <p className="text-gray-600 text-sm mb-3">{group.description}</p>
+                            <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                {group.memberCount}/{group.maxMembers} members
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                {group.university}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                </svg>
+                                {group.className}
+                              </span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                group.subject === 'Computer Science' ? 'bg-blue-100 text-blue-800' :
+                                group.subject === 'Data Science' ? 'bg-green-100 text-green-800' :
+                                group.subject === 'Mathematics' ? 'bg-purple-100 text-purple-800' :
+                                group.subject === 'Physics' ? 'bg-red-100 text-red-800' :
+                                group.subject === 'Chemistry' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {group.subject}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              Created by {group.createdBy} • {new Date(group.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="ml-4">
+                            {group.members.includes(user?.username || '') ? (
+                              <span className="px-3 py-1 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg">
+                                Member
+                              </span>
+                            ) : group.memberCount >= group.maxMembers ? (
+                              <span className="px-3 py-1 bg-red-100 text-red-600 text-sm font-medium rounded-lg">
+                                Full
+                              </span>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleJoinPublicGroup(group)
+                                }}
+                                className="px-3 py-1 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition duration-200"
+                              >
+                                Join Group
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -1643,7 +2124,7 @@ export default function Home() {
                           setIsGroupDetailsOpen(false)
                           setSelectedGroupForDetails(null)
                           if (selectedGroupForDetails) {
-                            handleScheduleMeeting(selectedGroupForDetails)
+                          handleScheduleMeeting(selectedGroupForDetails)
                           }
                         }}
                         className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"

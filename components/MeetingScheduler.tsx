@@ -30,20 +30,18 @@ export default function MeetingScheduler({ isOpen, onClose, onScheduleMeeting, g
     setLoading(true)
 
     try {
-      const meetingData: Meeting = {
+      const meetingData = {
         ...formData,
         groupId,
         groupName,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
         createdBy: 'current-user', // TODO: Get from auth context
         attendees: ['current-user'] // TODO: Get from auth context
       }
 
       // Save meeting to database
-      await devMeetings.saveMeeting(meetingData)
+      const savedMeeting = await devMeetings.createMeeting(meetingData)
       
-      onScheduleMeeting(meetingData)
+      onScheduleMeeting(savedMeeting)
       onClose()
       
       // Reset form
