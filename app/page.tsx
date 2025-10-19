@@ -47,6 +47,12 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [documents, setDocuments] = useState<any[]>([])
   const [documentsLoading, setDocumentsLoading] = useState(false)
+  const [showFindGroups, setShowFindGroups] = useState(false)
+  const [allPublicGroups, setAllPublicGroups] = useState<StudyGroup[]>([])
+  const [filteredGroups, setFilteredGroups] = useState<StudyGroup[]>([])
+  const [universityFilter, setUniversityFilter] = useState('')
+  const [classNameFilter, setClassNameFilter] = useState('')
+  const [findGroupsLoading, setFindGroupsLoading] = useState(false)
   const { user, loading, signOut, isAWSMode, retryAWS } = useAuth()
 
   // Handle URL tab parameter
@@ -595,6 +601,90 @@ export default function Home() {
     alert('Group settings update not yet implemented. This feature will be available soon.')
   }
 
+  const loadPublicGroups = async () => {
+    if (!user) return
+
+    setFindGroupsLoading(true)
+    try {
+      // Load all public study groups
+      const allGroups = await getAllStudyGroups()
+      const publicGroups = allGroups.filter(group => group.isPublic)
+      setAllPublicGroups(publicGroups)
+      setFilteredGroups(publicGroups)
+    } catch (error) {
+      console.error('Error loading public groups:', error)
+      alert('Failed to load public groups')
+    } finally {
+      setFindGroupsLoading(false)
+    }
+  }
+
+  const handleFindGroupsToggle = () => {
+    setShowFindGroups(!showFindGroups)
+    if (!showFindGroups && allPublicGroups.length === 0) {
+      loadPublicGroups()
+    } else if (!showFindGroups) {
+      // Reset filters when opening Find Groups
+      setUniversityFilter('')
+      setClassNameFilter('')
+      setFilteredGroups(allPublicGroups)
+    }
+  }
+
+  const handleFilterChange = () => {
+    let filtered = allPublicGroups
+
+    if (universityFilter) {
+      filtered = filtered.filter(group => 
+        group.university === universityFilter
+      )
+    }
+
+    if (classNameFilter) {
+      filtered = filtered.filter(group => 
+        group.className.toLowerCase().includes(classNameFilter.toLowerCase())
+      )
+    }
+
+    setFilteredGroups(filtered)
+  }
+
+  const handleJoinPublicGroup = async (group: StudyGroup) => {
+    if (!user) return
+
+    // Check if user is already a member
+    if (group.members.includes(user.username)) {
+      alert('You are already a member of this group!')
+      return
+    }
+
+    // Check if group is full
+    if (group.memberCount >= group.maxMembers) {
+      alert('This group is full and cannot accept new members.')
+      return
+    }
+
+    const confirmMessage = `Are you sure you want to join "${group.name}"?`
+    if (confirm(confirmMessage)) {
+      try {
+        await joinStudyGroup(group.id, user.username)
+        alert('Successfully joined the group!')
+        
+        // Reload both user groups and public groups
+        loadStudyGroups()
+        loadPublicGroups()
+      } catch (error) {
+        console.error('Error joining group:', error)
+        alert('Failed to join group. Please try again.')
+      }
+    }
+  }
+
+  // Update filtered groups when allPublicGroups change (initial load)
+  useEffect(() => {
+    setFilteredGroups(allPublicGroups)
+  }, [allPublicGroups])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -1025,7 +1115,14 @@ export default function Home() {
                     <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">{invites.length}</span>
                   )}
                 </button>
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-medium flex items-center">
+                <button 
+                  onClick={handleFindGroupsToggle}
+                  className={`px-4 py-2 rounded-lg transition duration-200 font-medium flex items-center ${
+                    showFindGroups 
+                      ? 'bg-blue-700 text-white' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
@@ -1055,6 +1152,196 @@ export default function Home() {
                         invite={invite}
                         onRespond={handleInviteResponse}
                       />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Find Groups Section */}
+            {showFindGroups && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900">Find Public Study Groups</h3>
+                  <button
+                    onClick={() => loadPublicGroups()}
+                    disabled={findGroupsLoading}
+                    className="text-blue-600 hover:text-blue-700 text-sm font-medium disabled:opacity-50"
+                  >
+                    {findGroupsLoading ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
+
+                {/* Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label htmlFor="university-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                      Filter by University
+                    </label>
+                    <select
+                      id="university-filter"
+                      value={universityFilter}
+                      onChange={(e) => setUniversityFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">All Universities</option>
+                      <option value="University of Washington">University of Washington</option>
+                      <option value="University of California, Berkeley">University of California, Berkeley</option>
+                      <option value="Stanford University">Stanford University</option>
+                      <option value="University of California, Los Angeles">University of California, Los Angeles</option>
+                      <option value="University of California, San Diego">University of California, San Diego</option>
+                      <option value="University of Southern California">University of Southern California</option>
+                      <option value="California Institute of Technology">California Institute of Technology</option>
+                      <option value="University of California, Davis">University of California, Davis</option>
+                      <option value="University of California, Irvine">University of California, Irvine</option>
+                      <option value="University of California, Santa Barbara">University of California, Santa Barbara</option>
+                      <option value="University of California, Santa Cruz">University of California, Santa Cruz</option>
+                      <option value="University of California, Riverside">University of California, Riverside</option>
+                      <option value="University of California, Merced">University of California, Merced</option>
+                      <option value="University of Oregon">University of Oregon</option>
+                      <option value="Oregon State University">Oregon State University</option>
+                      <option value="Portland State University">Portland State University</option>
+                      <option value="University of British Columbia">University of British Columbia</option>
+                      <option value="Simon Fraser University">Simon Fraser University</option>
+                      <option value="University of Victoria">University of Victoria</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="class-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                      Filter by Class Name
+                    </label>
+                    <input
+                      id="class-filter"
+                      type="text"
+                      placeholder="e.g., CSE 142, MATH 124"
+                      value={classNameFilter}
+                      onChange={(e) => setClassNameFilter(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleFilterChange()}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Search Button */}
+                <div className="flex items-center justify-between mb-6">
+                  <button
+                    onClick={handleFilterChange}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-medium flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Search Groups
+                  </button>
+                  <button
+                    onClick={() => {
+                      setUniversityFilter('')
+                      setClassNameFilter('')
+                      setFilteredGroups(allPublicGroups)
+                    }}
+                    className="text-gray-600 hover:text-gray-800 text-sm font-medium"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+
+                {/* Results */}
+                {findGroupsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Loading public groups...</p>
+                  </div>
+                ) : filteredGroups.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-600">
+                      {allPublicGroups.length === 0 
+                        ? 'No public study groups found. Be the first to create one!'
+                        : 'No groups match your current filters. Try adjusting your search criteria.'
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600 mb-4">
+                      Showing {filteredGroups.length} of {allPublicGroups.length} public groups
+                    </p>
+                    {filteredGroups.map(group => (
+                      <div 
+                        key={group.id} 
+                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <h4 className="text-lg font-semibold text-gray-900">{group.name}</h4>
+                              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                                Public
+                              </span>
+                            </div>
+                            <p className="text-gray-600 text-sm mb-3">{group.description}</p>
+                            <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                {group.memberCount}/{group.maxMembers} members
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                {group.university}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                </svg>
+                                {group.className}
+                              </span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                group.subject === 'Computer Science' ? 'bg-blue-100 text-blue-800' :
+                                group.subject === 'Data Science' ? 'bg-green-100 text-green-800' :
+                                group.subject === 'Mathematics' ? 'bg-purple-100 text-purple-800' :
+                                group.subject === 'Physics' ? 'bg-red-100 text-red-800' :
+                                group.subject === 'Chemistry' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {group.subject}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              Created by {group.createdBy} • {new Date(group.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="ml-4">
+                            {group.members.includes(user?.username || '') ? (
+                              <span className="px-3 py-1 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg">
+                                Member
+                              </span>
+                            ) : group.memberCount >= group.maxMembers ? (
+                              <span className="px-3 py-1 bg-red-100 text-red-600 text-sm font-medium rounded-lg">
+                                Full
+                              </span>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleJoinPublicGroup(group)
+                                }}
+                                className="px-3 py-1 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition duration-200"
+                              >
+                                Join Group
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}

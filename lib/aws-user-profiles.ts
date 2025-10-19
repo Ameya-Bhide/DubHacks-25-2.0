@@ -136,7 +136,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
       givenName: 'User',
       familyName: 'Name',
       university: 'University of Washington',
-      className: 'CSE 142',
+      className: '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
@@ -170,7 +170,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
       givenName: 'User',
       familyName: 'Name',
       university: 'University of Washington',
-      className: 'CSE 142',
+      className: '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
