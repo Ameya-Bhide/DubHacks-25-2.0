@@ -204,34 +204,38 @@ export const devInvites = {
   }
 }
 
-// Meeting functions (simplified for now)
+// Meeting functions - now using AWS DynamoDB
 export const devMeetings = {
   createMeeting: async (meeting: Omit<Meeting, 'id' | 'createdAt'>): Promise<Meeting> => {
-    const newMeeting: Meeting = {
-      ...meeting,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
+    const hasDynamoDB = await checkDynamoDBConfigFromBrowser()
+
+    if (!hasDynamoDB) {
+      throw new Error('AWS DynamoDB not configured. Please configure AWS credentials.')
     }
-    
-    if (typeof window !== 'undefined') {
-      const meetings = JSON.parse(localStorage.getItem('dev-meetings') || '[]')
-      meetings.push(newMeeting)
-      localStorage.setItem('dev-meetings', JSON.stringify(meetings))
-    }
-    
-    return newMeeting
+
+    const result = await apiCall('createMeeting', meeting)
+    return result.meeting
   },
   
   getMeetingsForGroup: async (groupId: string): Promise<Meeting[]> => {
-    if (typeof window === 'undefined') return []
-    const meetings = JSON.parse(localStorage.getItem('dev-meetings') || '[]')
-    return meetings.filter((meeting: Meeting) => meeting.groupId === groupId)
+    const hasDynamoDB = await checkDynamoDBConfigFromBrowser()
+
+    if (!hasDynamoDB) {
+      console.log('🔧 No DynamoDB config - returning empty meetings array')
+      return []
+    }
+
+    const result = await apiCall('getMeetingsForGroup', { groupId })
+    return result.meetings
   },
   
   deleteMeeting: async (meetingId: string): Promise<void> => {
-    if (typeof window === 'undefined') throw new Error('Not in browser environment')
-    const meetings = JSON.parse(localStorage.getItem('dev-meetings') || '[]')
-    const filteredMeetings = meetings.filter((meeting: Meeting) => meeting.id !== meetingId)
-    localStorage.setItem('dev-meetings', JSON.stringify(filteredMeetings))
+    const hasDynamoDB = await checkDynamoDBConfigFromBrowser()
+
+    if (!hasDynamoDB) {
+      throw new Error('AWS DynamoDB not configured. Please configure AWS credentials.')
+    }
+
+    await apiCall('deleteMeeting', { meetingId })
   }
 }

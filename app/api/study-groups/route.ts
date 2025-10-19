@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 const TABLE_NAME = 'StudyGroups'
 const INVITES_TABLE_NAME = 'StudyGroupInvites'
+const MEETINGS_TABLE_NAME = 'StudyGroupMeetings'
 
 // Initialize DynamoDB client
 const client = new DynamoDBClient({
@@ -371,6 +372,61 @@ export async function POST(request: NextRequest) {
       const command = new DeleteCommand({
         TableName: INVITES_TABLE_NAME,
         Key: { id: inviteId }
+      })
+      
+      await docClient.send(command)
+      return NextResponse.json({ success: true })
+    }
+
+    // Meeting actions
+    if (action === 'createMeeting') {
+      const { groupId, title, description, date, time, duration, location, meetingType, createdBy, attendees } = data
+      
+      const meeting = {
+        id: Date.now().toString(),
+        groupId,
+        title,
+        description,
+        date,
+        time,
+        duration,
+        location,
+        meetingType,
+        createdBy,
+        attendees: attendees || [createdBy],
+        createdAt: new Date().toISOString()
+      }
+      
+      const command = new PutCommand({
+        TableName: MEETINGS_TABLE_NAME,
+        Item: meeting
+      })
+      
+      await docClient.send(command)
+      return NextResponse.json({ success: true, meeting })
+    }
+
+    if (action === 'getMeetingsForGroup') {
+      const { groupId } = data
+      
+      const command = new ScanCommand({
+        TableName: MEETINGS_TABLE_NAME,
+        FilterExpression: 'groupId = :groupId',
+        ExpressionAttributeValues: {
+          ':groupId': groupId
+        }
+      })
+      
+      const result = await docClient.send(command)
+      return NextResponse.json({ success: true, meetings: result.Items || [] })
+    }
+
+    if (action === 'deleteMeeting') {
+      const { meetingId } = data
+      
+      const command = new DeleteCommand({
+        TableName: MEETINGS_TABLE_NAME,
+        Key: { id: meetingId }
       })
       
       await docClient.send(command)
