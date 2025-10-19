@@ -636,7 +636,7 @@ export default function Home() {
 
     if (universityFilter) {
       filtered = filtered.filter(group => 
-        group.university.toLowerCase().includes(universityFilter.toLowerCase())
+        group.university === universityFilter
       )
     }
 
@@ -1178,15 +1178,34 @@ export default function Home() {
                     <label htmlFor="university-filter" className="block text-sm font-medium text-gray-700 mb-2">
                       Filter by University
                     </label>
-                    <input
+                    <select
                       id="university-filter"
-                      type="text"
-                      placeholder="e.g., University of Washington"
                       value={universityFilter}
                       onChange={(e) => setUniversityFilter(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleFilterChange()}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    >
+                      <option value="">All Universities</option>
+                      <option value="University of Washington">University of Washington</option>
+                      <option value="University of California, Berkeley">University of California, Berkeley</option>
+                      <option value="Stanford University">Stanford University</option>
+                      <option value="University of California, Los Angeles">University of California, Los Angeles</option>
+                      <option value="University of California, San Diego">University of California, San Diego</option>
+                      <option value="University of Southern California">University of Southern California</option>
+                      <option value="California Institute of Technology">California Institute of Technology</option>
+                      <option value="University of California, Davis">University of California, Davis</option>
+                      <option value="University of California, Irvine">University of California, Irvine</option>
+                      <option value="University of California, Santa Barbara">University of California, Santa Barbara</option>
+                      <option value="University of California, Santa Cruz">University of California, Santa Cruz</option>
+                      <option value="University of California, Riverside">University of California, Riverside</option>
+                      <option value="University of California, Merced">University of California, Merced</option>
+                      <option value="University of Oregon">University of Oregon</option>
+                      <option value="Oregon State University">Oregon State University</option>
+                      <option value="Portland State University">Portland State University</option>
+                      <option value="University of British Columbia">University of British Columbia</option>
+                      <option value="Simon Fraser University">Simon Fraser University</option>
+                      <option value="University of Victoria">University of Victoria</option>
+                      <option value="Other">Other</option>
+                    </select>
                   </div>
                   <div>
                     <label htmlFor="class-filter" className="block text-sm font-medium text-gray-700 mb-2">
