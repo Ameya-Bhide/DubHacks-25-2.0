@@ -623,6 +623,11 @@ export default function Home() {
     setShowFindGroups(!showFindGroups)
     if (!showFindGroups && allPublicGroups.length === 0) {
       loadPublicGroups()
+    } else if (!showFindGroups) {
+      // Reset filters when opening Find Groups
+      setUniversityFilter('')
+      setClassNameFilter('')
+      setFilteredGroups(allPublicGroups)
     }
   }
 
@@ -675,10 +680,10 @@ export default function Home() {
     }
   }
 
-  // Update filtered groups when filters change
+  // Update filtered groups when allPublicGroups change (initial load)
   useEffect(() => {
-    handleFilterChange()
-  }, [universityFilter, classNameFilter, allPublicGroups])
+    setFilteredGroups(allPublicGroups)
+  }, [allPublicGroups])
 
   if (loading) {
     return (
@@ -1168,7 +1173,7 @@ export default function Home() {
                 </div>
 
                 {/* Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label htmlFor="university-filter" className="block text-sm font-medium text-gray-700 mb-2">
                       Filter by University
@@ -1179,6 +1184,7 @@ export default function Home() {
                       placeholder="e.g., University of Washington"
                       value={universityFilter}
                       onChange={(e) => setUniversityFilter(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleFilterChange()}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -1192,9 +1198,33 @@ export default function Home() {
                       placeholder="e.g., CSE 142, MATH 124"
                       value={classNameFilter}
                       onChange={(e) => setClassNameFilter(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleFilterChange()}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
+                </div>
+
+                {/* Search Button */}
+                <div className="flex items-center justify-between mb-6">
+                  <button
+                    onClick={handleFilterChange}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-medium flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Search Groups
+                  </button>
+                  <button
+                    onClick={() => {
+                      setUniversityFilter('')
+                      setClassNameFilter('')
+                      setFilteredGroups(allPublicGroups)
+                    }}
+                    className="text-gray-600 hover:text-gray-800 text-sm font-medium"
+                  >
+                    Clear Filters
+                  </button>
                 </div>
 
                 {/* Results */}
