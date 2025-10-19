@@ -84,19 +84,47 @@ function add_to_stored_file(data) {
       }
     }
 
-    // Create a new YAML entry
+    // // Create a new YAML entry
+    // const newEntry = {
+    //   [data["Name of file"]]: [
+    //     { "File Path": data["File path"] },
+    //     { "Class Name": data["Class Name"] },
+    //     { "Study Group Name": data["Study Group Name"] },
+    //     { "Date Created": data["Date Created"] }
+    //   ]
+    // };
+
+    // // Append new entry
+    // existingData = existingData || [];
+    // existingData.push(newEntry);
+
+    // Normalize in case YAML file is not an array
+    if (!Array.isArray(existingData)) existingData = [];
+
+    // Prepare new or updated entry
+    const fileName = data["File path"];
     const newEntry = {
-      [data["Name of file"]]: [
+      [fileName]: [
         { "File Path": data["File path"] },
+        { "Name of File": data["Name of file"] },
         { "Class Name": data["Class Name"] },
         { "Study Group Name": data["Study Group Name"] },
         { "Date Created": data["Date Created"] }
       ]
     };
 
-    // Append new entry
-    existingData = existingData || [];
-    existingData.push(newEntry);
+    // Look for existing entry with same file name
+    const index = existingData.findIndex(entry => Object.keys(entry)[0] === fileName);
+
+    if (index >= 0) {
+      // Update existing entry
+      existingData[index] = newEntry;
+      console.log(`🔄 Updated entry for ${fileName}`);
+    } else {
+      // Append new entry
+      existingData.push(newEntry);
+      console.log(`✅ Added new entry for ${fileName}`);
+    }
 
     // Write updated YAML back to file
     const yamlStr = yaml.dump(existingData, { lineWidth: -1 });
@@ -127,19 +155,47 @@ function add_to_shared_file(data) {
       }
     }
 
-    // Create a new YAML entry
+    // // Create a new YAML entry
+    // const newEntry = {
+    //   [data["Name of file"]]: [
+    //     { "File Path": data["File path"] },
+    //     { "Class Name": data["Class Name"] },
+    //     { "Study Group Name": data["Study Group Name"] },
+    //     { "Date Created": data["Date Created"] }
+    //   ]
+    // };
+
+    // // Append new entry
+    // existingData = existingData || [];
+    // existingData.push(newEntry);
+
+    // Normalize in case YAML file is not an array
+    if (!Array.isArray(existingData)) existingData = [];
+
+    // Prepare new or updated entry
+    const fileName = data["File path"];
     const newEntry = {
-      [data["Name of file"]]: [
+      [fileName]: [
         { "File Path": data["File path"] },
+        { "Name of File": data["Name of file"] },
         { "Class Name": data["Class Name"] },
         { "Study Group Name": data["Study Group Name"] },
         { "Date Created": data["Date Created"] }
       ]
     };
 
-    // Append new entry
-    existingData = existingData || [];
-    existingData.push(newEntry);
+    // Look for existing entry with same file name
+    const index = existingData.findIndex(entry => Object.keys(entry)[0] === fileName);
+
+    if (index >= 0) {
+      // Update existing entry
+      existingData[index] = newEntry;
+      console.log(`🔄 Updated entry for ${fileName}`);
+    } else {
+      // Append new entry
+      existingData.push(newEntry);
+      console.log(`✅ Added new entry for ${fileName}`);
+    }
 
     // Write updated YAML back to file
     const yamlStr = yaml.dump(existingData, { lineWidth: -1 });
