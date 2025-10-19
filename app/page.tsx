@@ -9,11 +9,12 @@ import ConfirmSignUpForm from '@/components/ConfirmSignUpForm'
 import CreateGroupModal from '@/components/CreateGroupModal'
 import MeetingScheduler from '@/components/MeetingScheduler'
 import InviteCard from '@/components/InviteCard'
+import InviteModal from '@/components/InviteModal'
 import FileNotifications from '@/components/FileNotifications'
 import DocumentCard from '@/components/DocumentCard'
 import OpenFileModal from '@/components/OpenFileModal'
-import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup, devMeetings, Meeting } from '@/lib/aws-study-groups'
-import { hasRealAWSConfig } from '@/lib/aws-config'
+import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup, devMeetings, Meeting, getInvitesForEmail, getAllInvites, respondToInvite, deleteInvite, sendInvite, getAllStudyGroups, joinStudyGroup } from '@/lib/aws-study-groups'
+import { hasRealAWSConfig, checkDynamoDBConfigFromBrowser, isElectron } from '@/lib/aws-config'
 import { getUserProfile, UserProfile } from '@/lib/aws-user-profiles'
 
 type AuthView = 'login' | 'signup' | 'confirm' | 'forgot'
@@ -37,6 +38,8 @@ export default function Home() {
   const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([])
   const [invites, setInvites] = useState<any[]>([])
   const [showInvites, setShowInvites] = useState(false)
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [selectedGroupForInvite, setSelectedGroupForInvite] = useState<StudyGroup | null>(null)
   const [showFileNotifications, setShowFileNotifications] = useState(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [documents, setDocuments] = useState<any[]>([])
@@ -267,19 +270,17 @@ export default function Home() {
     if (!user) return
 
     try {
-      const isAWS = hasRealAWSConfig()
-      const groups = isAWS
-        ? await getUserStudyGroups(user.username) // Real AWS call
-        : await devStudyGroups.getUserStudyGroups(user.username)
-
+      // Always use AWS DynamoDB (no localStorage fallback)
+      const groups = await getUserStudyGroups(user.username)
       setStudyGroups(groups)
       
       // Debug: Log all groups to console
       console.log('📊 All Study Groups:', groups)
-      if (isAWS) {
-        console.log('🔗 AWS Mode - Data loaded from DynamoDB')
+      const isElectronEnv = isElectron()
+      if (isElectronEnv) {
+        console.log('🖥️ Electron Mode - Data loaded from AWS DynamoDB')
       } else {
-        console.log('💾 Dev Mode - Data stored in localStorage')
+        console.log('🔗 Browser Mode - Data loaded from AWS DynamoDB')
       }
     } catch (error) {
       console.error('Error loading study groups:', error)
@@ -290,21 +291,26 @@ export default function Home() {
     if (!user) return
 
     try {
-      const response = await fetch('/api/study-groups', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'getUserInvites',
-          data: { userId: user.username }
-        })
-      })
-
-      const result = await response.json()
-      if (result.success) {
-        setInvites(result.invites)
+      // For dev mode, we'll load invites based on user's email
+      // In a real app, this would be based on the logged-in user's email
+      const userEmail = user.email || `${user.username}@example.com`
+      
+      console.log('Loading invites for user email:', userEmail)
+      
+      // In Electron, always use localStorage
+      const isElectronEnv = isElectron()
+      if (isElectronEnv) {
+        console.log('🖥️ Electron Mode - Loading invites from localStorage')
       }
+      
+      // Get all invites for the user using the appropriate data source (AWS or localStorage)
+      const allUserInvites = await getInvitesForEmail(userEmail)
+      console.log('Found invites for user:', allUserInvites)
+      
+      // Just show all invites for now - don't filter automatically
+      // The user can manually clean up outdated invites using the cleanup button
+      console.log('All user invites (no filtering):', allUserInvites)
+      setInvites(allUserInvites)
     } catch (error) {
       console.error('Error loading invites:', error)
     }
@@ -327,6 +333,15 @@ export default function Home() {
 
     setDocumentsLoading(true)
     try {
+      // In Electron, skip document loading since API routes don't work
+      const isElectronEnv = isElectron()
+      if (isElectronEnv) {
+        console.log('🖥️ Electron Mode - Skipping document loading (API routes not available)')
+        setDocuments([])
+        setDocumentsLoading(false)
+        return
+      }
+      
       const response = await fetch(`/api/ai-helper-files?userId=${user.username}&action=getUserFiles`)
       const result = await response.json()
       
@@ -372,7 +387,7 @@ export default function Home() {
           application: application
         })
       })
-      
+
       const result = await response.json()
       
       if (result.success) {
@@ -423,35 +438,21 @@ export default function Home() {
     if (!user) return
 
     try {
-      const apiResponse = await fetch('/api/study-groups', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'respondToInvite',
-          data: { 
-            inviteId, 
-            userId: user.username, 
-            response 
-          }
-        })
-      })
-
-      const result = await apiResponse.json()
-      if (result.success) {
+      // Update invite status using the appropriate data source (AWS or localStorage)
+      await respondToInvite(inviteId, response, user.username)
+      
         // Remove the invite from the list
         setInvites(prev => prev.filter(invite => invite.id !== inviteId))
         
-        // If accepted, reload study groups
-        if (response === 'accept') {
-          loadStudyGroups()
-        }
-        
-        alert(result.message)
-      } else {
-        alert(result.error || 'Failed to respond to invite')
+      // Note: The respondToInvite function already handles adding the user to the group
+      // when the response is 'accept', so we don't need to call joinStudyGroup separately
+      
+      // Reload study groups to show the new membership if accepted
+      if (response === 'accept') {
+        loadStudyGroups()
       }
+      
+      alert(`Invite ${response}ed successfully!`)
     } catch (error) {
       console.error('Error responding to invite:', error)
       alert('Failed to respond to invite')
@@ -462,17 +463,16 @@ export default function Home() {
     if (!user) return
 
     try {
-      const isAWS = hasRealAWSConfig()
-      const newGroup = isAWS
-        ? await createStudyGroup(groupData, user.username) // Real AWS call
-        : await devStudyGroups.createStudyGroup(groupData, user.username)
+      // Always use AWS DynamoDB (no localStorage fallback)
+      const newGroup = await createStudyGroup({ ...groupData, createdBy: user.username })
       
       setStudyGroups(prev => [newGroup, ...prev])
       console.log('Study group created:', newGroup)
-      if (isAWS) {
-        console.log('🔗 AWS Mode - Group saved to DynamoDB')
+      const isElectronEnv = isElectron()
+      if (isElectronEnv) {
+        console.log('🖥️ Electron Mode - Group saved to AWS DynamoDB')
       } else {
-        console.log('💾 Dev Mode - Group saved to localStorage')
+        console.log('🔗 Browser Mode - Group saved to AWS DynamoDB')
       }
     } catch (error) {
       console.error('Error creating study group:', error)
@@ -499,6 +499,16 @@ export default function Home() {
     } catch (error) {
       console.error('Error scheduling meeting:', error)
     }
+  }
+
+  const handleInviteMembers = (group: StudyGroup) => {
+    setSelectedGroupForInvite(group)
+    setIsInviteModalOpen(true)
+  }
+
+  const handleInviteSent = () => {
+    // Refresh invites list
+    loadInvites()
   }
 
   const handleStudyGroupClick = async (group: StudyGroup) => {
@@ -1050,6 +1060,106 @@ export default function Home() {
                 </svg>
               </button>
             )}
+
+            {/* Clean Up Invites Button (only show in dev mode) */}
+            {!hasRealAWSConfig() && (
+              <button 
+                onClick={async () => {
+                  try {
+                    const { devInvites } = await import('@/lib/aws-study-groups')
+                    const removedCount = await devInvites.cleanupOutdatedInvites()
+                    
+                    if (removedCount > 0) {
+                      alert(`Cleaned up ${removedCount} outdated invites!`)
+                      // Reload invites to show updated list
+                      loadInvites()
+                    } else {
+                      alert('No outdated invites found!')
+                    }
+                  } catch (error) {
+                    console.error('Error cleaning up invites:', error)
+                    alert('Failed to clean up invites')
+                  }
+                }}
+                className="fixed bottom-6 right-40 w-14 h-14 bg-orange-600 text-white rounded-full shadow-lg hover:bg-orange-700 hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50"
+                title="Clean Up Outdated Invites"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
+
+            {/* View All Invites Button (only show in dev mode) */}
+            {!hasRealAWSConfig() && (
+              <button 
+                onClick={async () => {
+                  try {
+                    const allInvites = await getAllInvites()
+                    
+                    console.log('All invites in system:', allInvites)
+                    
+                    if (allInvites.length === 0) {
+                      alert('No invites found in the system!')
+                    } else {
+                      const inviteList = allInvites.map(invite => 
+                        `• ${invite.groupName} → ${invite.inviteeEmail} (${invite.status})`
+                      ).join('\n')
+                      
+                      alert(`All invites in system (${allInvites.length}):\n\n${inviteList}`)
+                    }
+                  } catch (error) {
+                    console.error('Error viewing all invites:', error)
+                    alert('Failed to view all invites')
+                  }
+                }}
+                className="fixed bottom-6 right-56 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50"
+                title="View All Invites (Debug)"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </button>
+            )}
+
+            {/* Test Invite Button (only show in dev mode) */}
+            {!hasRealAWSConfig() && studyGroups.length > 0 && (
+              <button 
+                onClick={async () => {
+                  try {
+                    const userEmail = user?.email || `${user?.username}@example.com`
+                    
+                    // Create a test invite for the current user
+                    const testInvite = {
+                      id: Date.now().toString(),
+                      groupId: studyGroups[0].id,
+                      groupName: studyGroups[0].name,
+                      inviterId: 'test-user',
+                      inviterName: 'Test User',
+                      inviteeEmail: userEmail,
+                      status: 'pending' as const,
+                      createdAt: new Date().toISOString()
+                    }
+                    
+                    await sendInvite(testInvite)
+                    alert(`Test invite created for ${userEmail} to join "${studyGroups[0].name}"!`)
+                    
+                    // Reload invites to show the new one
+                    loadInvites()
+                  } catch (error) {
+                    console.error('Error creating test invite:', error)
+                    alert('Failed to create test invite')
+                  }
+                }}
+                className="fixed bottom-6 right-72 w-14 h-14 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50"
+                title="Create Test Invite"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              </button>
+            )}
           </div>
         )}
 
@@ -1087,21 +1197,21 @@ export default function Home() {
                 <p className="text-gray-600">Loading documents...</p>
               </div>
             ) : documents.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents Yet</h3>
-                <p className="text-gray-600 mb-6">Upload and organize your study materials, notes, and resources.</p>
-                <button 
-                  onClick={() => setShowUploadModal(true)}
-                  className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition duration-200"
-                >
-                  Upload Documents
-                </button>
+            <div className="text-center py-12">
+              <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
               </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents Yet</h3>
+              <p className="text-gray-600 mb-6">Upload and organize your study materials, notes, and resources.</p>
+              <button 
+                onClick={() => setShowUploadModal(true)}
+                className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition duration-200"
+              >
+                Upload Documents
+              </button>
+            </div>
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
@@ -1656,10 +1766,7 @@ export default function Home() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
                       <div className="space-y-3">
                         <button
-                          onClick={() => {
-                            // Show group ID for sharing
-                            alert(`Share this group ID with others: ${selectedGroupForDetails.id}`)
-                          }}
+                          onClick={() => handleInviteMembers(selectedGroupForDetails)}
                           className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
                           Invite Members
@@ -1678,6 +1785,22 @@ export default function Home() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Invite Modal */}
+      {selectedGroupForInvite && (
+        <InviteModal
+          isOpen={isInviteModalOpen}
+          onClose={() => {
+            setIsInviteModalOpen(false)
+            setSelectedGroupForInvite(null)
+          }}
+          groupId={String(selectedGroupForInvite.id)}
+          groupName={selectedGroupForInvite.name}
+          inviterId={user?.username || ''}
+          inviterName={user?.username || ''}
+          onInviteSent={handleInviteSent}
+        />
       )}
     </div>
   )

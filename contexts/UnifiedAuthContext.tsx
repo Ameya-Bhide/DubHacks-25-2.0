@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { hasRealAWSConfig } from '@/lib/aws-config'
 
 interface User {
   username: string
@@ -33,11 +34,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAWSMode, setIsAWSMode] = useState(false)
 
   useEffect(() => {
-    // For now, force dev mode to prevent loading issues
-    console.log('🛠️ Using development authentication (forced)')
-    setIsAWSMode(false)
-    setLoading(false) // Immediately stop loading
-    initializeDevAuth()
+    const initializeAuth = async () => {
+      if (hasRealAWSConfig()) {
+        console.log('🔐 Using AWS authentication')
+        setIsAWSMode(true)
+        await initializeAWSAuth()
+      } else {
+        console.log('🛠️ Using development authentication')
+        setIsAWSMode(false)
+        setLoading(false)
+        initializeDevAuth()
+      }
+    }
+    
+    initializeAuth()
   }, [])
 
   const initializeAWSAuth = async () => {

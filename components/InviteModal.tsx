@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { devInvites, Invite, getAllStudyGroups, sendInvite, getAllInvites } from '@/lib/aws-study-groups'
+import { checkDynamoDBConfigFromBrowser } from '@/lib/aws-config'
 
 interface InviteModalProps {
   isOpen: boolean
@@ -8,10 +10,11 @@ interface InviteModalProps {
   groupId: string
   groupName: string
   inviterId: string
+  inviterName: string
   onInviteSent: () => void
 }
 
-export default function InviteModal({ isOpen, onClose, groupId, groupName, inviterId, onInviteSent }: InviteModalProps) {
+export default function InviteModal({ isOpen, onClose, groupId, groupName, inviterId, inviterName, onInviteSent }: InviteModalProps) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -27,31 +30,76 @@ export default function InviteModal({ isOpen, onClose, groupId, groupName, invit
     setError('')
 
     try {
-      const response = await fetch('/api/study-groups', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'sendInvite',
-          data: {
-            groupId,
-            inviterId,
-            inviteeEmail: email.trim()
-          }
-        })
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to send invite')
+      // First, verify that the group still exists using the appropriate data source (AWS or localStorage)
+      const allGroups = await getAllStudyGroups()
+      
+      // Ensure groupId is always a string for consistent comparison
+      const normalizedGroupId = String(groupId)
+      
+      console.log('Debug - Looking for group with ID:', groupId, 'Type:', typeof groupId)
+      console.log('Debug - Normalized group ID:', normalizedGroupId, 'Type:', typeof normalizedGroupId)
+      console.log('Debug - Available groups:', allGroups.map(g => ({ id: g.id, name: g.name, idType: typeof g.id })))
+      const hasDynamoDB = await checkDynamoDBConfigFromBrowser()
+      console.log('Debug - Using AWS DynamoDB:', hasDynamoDB)
+      
+      // Try multiple matching strategies to handle type mismatches
+      let groupExists = allGroups.find(g => String(g.id) === normalizedGroupId) // String comparison (primary)
+      if (!groupExists) {
+        groupExists = allGroups.find(g => g.id === normalizedGroupId) // Exact match
       }
+      if (!groupExists) {
+        groupExists = allGroups.find(g => Number(g.id) === Number(normalizedGroupId)) // Number comparison
+      }
+      if (!groupExists) {
+        groupExists = allGroups.find(g => g.id == normalizedGroupId) // Loose equality
+      }
+      
+      if (!groupExists) {
+        console.error('Debug - Group not found with ID:', groupId)
+        console.error('Debug - Available group IDs:', allGroups.map(g => g.id))
+        setError('This study group no longer exists. Please refresh the page and try again.')
+        return
+      }
+      
+      console.log('Debug - Found group:', groupExists)
+
+      // Check if the group is full
+      if (groupExists.memberCount >= groupExists.maxMembers) {
+        setError('This study group is full and cannot accept new members.')
+        return
+      }
+
+      // Check if the email is already a member
+      if (groupExists.members.includes(email.trim())) {
+        setError('This email is already a member of the study group.')
+        return
+      }
+
+      // Note: Removed restriction on sending multiple invites to the same person
+      // Users can now send multiple invites to the same email address
+
+      // Create invite object
+      const invite: Invite = {
+        id: Date.now().toString(),
+        groupId: normalizedGroupId, // Use the normalized string ID
+        groupName,
+        inviterId,
+        inviterName,
+        inviteeEmail: email.trim(),
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      }
+
+      // Save invite using the appropriate data source (AWS or localStorage)
+      await sendInvite(invite)
 
       // Reset form and close modal
       setEmail('')
       onInviteSent()
       onClose()
+      
+      // Show success message
+      alert(`Invitation sent to ${email.trim()}! They will see it in their invites and can join "${groupName}".`)
     } catch (error) {
       console.error('Error sending invite:', error)
       setError(error instanceof Error ? error.message : 'Failed to send invite')
@@ -106,19 +154,11 @@ export default function InviteModal({ isOpen, onClose, groupId, groupName, invit
               </div>
             )}
 
-            <div className="flex space-x-3 pt-4">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                disabled={loading}
-              >
-                Cancel
-              </button>
+            <div className="pt-4">
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <div className="flex items-center justify-center">
