@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { hasRealAWSConfig } from '@/lib/aws-config'
+import { loadAWSModules } from '@/lib/aws-loader'
 
 interface User {
   username: string
@@ -15,6 +16,8 @@ interface User {
 interface AuthContextType {
   user: User | null
   loading: boolean
+  isAWSMode: boolean
+  retryAWS: () => void
   signIn: (email: string, password: string) => Promise<any>
   signUp: (email: string, password: string, givenName: string, familyName: string) => Promise<any>
   signOut: () => Promise<void>
@@ -34,14 +37,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check if we have real AWS configuration
     const hasAWS = hasRealAWSConfig()
-    setIsAWSMode(hasAWS)
+    const awsFailed = localStorage.getItem('aws-amplify-failed') === 'true'
     
-    if (hasAWS) {
-      console.log('🔐 Using AWS Cognito authentication')
-      // Initialize AWS auth
+    if (hasAWS && !awsFailed) {
+      console.log('🔐 Attempting AWS Cognito authentication')
+      setIsAWSMode(true)
+      // Initialize AWS auth with fallback
       initializeAWSAuth()
     } else {
-      console.log('🛠️ Using development authentication')
+      if (awsFailed) {
+        console.log('🛠️ AWS Amplify previously failed, using development authentication')
+      } else {
+        console.log('🛠️ Using development authentication')
+      }
+      setIsAWSMode(false)
       // Initialize dev auth
       initializeDevAuth()
     }
@@ -49,9 +58,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const initializeAWSAuth = async () => {
     try {
-      // Dynamically import AWS auth functions
-      const { signIn: awsSignIn, signUp: awsSignUp, signOut: awsSignOut, confirmSignUp: awsConfirmSignUp, resendSignUpCode, resetPassword, confirmResetPassword, getCurrentUser, fetchAuthSession } = await import('aws-amplify/auth')
-      const { Hub } = await import('aws-amplify/utils')
+      // Load AWS modules using the reliable loader
+      let awsAuthModule, awsUtilsModule
+      try {
+        const modules = await loadAWSModules()
+        awsAuthModule = modules.auth
+        awsUtilsModule = modules.utils
+      } catch (loadError) {
+        console.warn('Failed to load AWS Amplify modules, falling back to dev mode:', loadError)
+        // Store the failure in localStorage to prevent repeated attempts
+        localStorage.setItem('aws-amplify-failed', 'true')
+        // Fall back to dev auth if AWS modules fail to load
+        setIsAWSMode(false)
+        initializeDevAuth()
+        return
+      }
+
+      const { signIn: awsSignIn, signUp: awsSignUp, signOut: awsSignOut, confirmSignUp: awsConfirmSignUp, resendSignUpCode, resetPassword, confirmResetPassword, getCurrentUser, fetchAuthSession } = awsAuthModule
+      const { Hub } = awsUtilsModule
+
+      // Clear the failure flag since AWS loaded successfully
+      localStorage.removeItem('aws-amplify-failed')
 
       // Check if user is already signed in
       try {
@@ -141,6 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Failed to initialize AWS auth:', error)
       // Fallback to dev auth
+      setIsAWSMode(false)
       initializeDevAuth()
     } finally {
       setLoading(false)
@@ -232,7 +260,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const [authFunctions, setAuthFunctions] = useState<Omit<AuthContextType, 'user' | 'loading'>>({
+  const [authFunctions, setAuthFunctions] = useState<Omit<AuthContextType, 'user' | 'loading' | 'isAWSMode' | 'retryAWS'>>({
     signIn: async () => {},
     signUp: async () => {},
     signOut: async () => {},
@@ -242,9 +270,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     forgotPasswordSubmit: async () => {}
   })
 
+  const retryAWS = () => {
+    console.log('🔄 Retrying AWS authentication...')
+    localStorage.removeItem('aws-amplify-failed')
+    if (hasRealAWSConfig()) {
+      setIsAWSMode(true)
+      initializeAWSAuth()
+    }
+  }
+
   const value = {
     user,
     loading,
+    isAWSMode,
+    retryAWS,
     ...authFunctions
   }
 

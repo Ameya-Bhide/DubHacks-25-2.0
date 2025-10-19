@@ -7,6 +7,7 @@ import LoginForm from '@/components/LoginForm'
 import SignUpForm from '@/components/SignUpForm'
 import ConfirmSignUpForm from '@/components/ConfirmSignUpForm'
 import CreateGroupModal from '@/components/CreateGroupModal'
+import InviteCard from '@/components/InviteCard'
 import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup } from '@/lib/aws-study-groups'
 import { hasRealAWSConfig } from '@/lib/aws-config'
 
@@ -20,7 +21,9 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('home')
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
   const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([])
-  const { user, loading, signOut } = useAuth()
+  const [invites, setInvites] = useState<any[]>([])
+  const [showInvites, setShowInvites] = useState(false)
+  const { user, loading, signOut, isAWSMode, retryAWS } = useAuth()
 
   // Handle URL tab parameter
   useEffect(() => {
@@ -43,10 +46,11 @@ export default function Home() {
     setAuthView('confirm')
   }
 
-  // Load study groups when user is authenticated
+  // Load study groups and invites when user is authenticated
   useEffect(() => {
     if (user) {
       loadStudyGroups()
+      loadInvites()
     }
   }, [user])
 
@@ -70,6 +74,69 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error loading study groups:', error)
+    }
+  }
+
+  const loadInvites = async () => {
+    if (!user) return
+
+    try {
+      const response = await fetch('/api/study-groups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'getUserInvites',
+          data: { userId: user.username }
+        })
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        setInvites(result.invites)
+      }
+    } catch (error) {
+      console.error('Error loading invites:', error)
+    }
+  }
+
+  const handleInviteResponse = async (inviteId: string, response: 'accept' | 'decline') => {
+    if (!user) return
+
+    try {
+      const apiResponse = await fetch('/api/study-groups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'respondToInvite',
+          data: { 
+            inviteId, 
+            userId: user.username, 
+            response 
+          }
+        })
+      })
+
+      const result = await apiResponse.json()
+      if (result.success) {
+        // Remove the invite from the list
+        setInvites(prev => prev.filter(invite => invite.id !== inviteId))
+        
+        // If accepted, reload study groups
+        if (response === 'accept') {
+          loadStudyGroups()
+        }
+        
+        alert(result.message)
+      } else {
+        alert(result.error || 'Failed to respond to invite')
+      }
+    } catch (error) {
+      console.error('Error responding to invite:', error)
+      alert('Failed to respond to invite')
     }
   }
 
@@ -211,6 +278,27 @@ export default function Home() {
             {/* User Actions */}
             <div className="flex items-center space-x-4">
               <span className="text-gray-700">Welcome, {user.username}!</span>
+              
+              {/* Mode Indicator */}
+              <div className="flex items-center space-x-2">
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  isAWSMode 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {isAWSMode ? 'AWS Mode' : 'Dev Mode'}
+                </span>
+                {!isAWSMode && hasRealAWSConfig() && (
+                  <button
+                    onClick={retryAWS}
+                    className="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 transition duration-200"
+                    title="Retry AWS authentication"
+                  >
+                    Retry AWS
+                  </button>
+                )}
+              </div>
+              
               <button
                 onClick={handleLogout}
                 className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-200"
@@ -367,12 +455,17 @@ export default function Home() {
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">My Study Groups</h2>
               <div className="flex items-center space-x-3">
-                <button className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition duration-200 font-medium flex items-center">
+                <button 
+                  onClick={() => setShowInvites(!showInvites)}
+                  className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition duration-200 font-medium flex items-center"
+                >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                   </svg>
                   Invites
-                  <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">2</span>
+                  {invites.length > 0 && (
+                    <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">{invites.length}</span>
+                  )}
                 </button>
                 <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200 font-medium flex items-center">
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -382,6 +475,33 @@ export default function Home() {
                 </button>
               </div>
             </div>
+
+            {/* Invites Section */}
+            {showInvites && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Invites</h3>
+                {invites.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-600">No pending invites</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {invites.map(invite => (
+                      <InviteCard
+                        key={invite.id}
+                        invite={invite}
+                        onRespond={handleInviteResponse}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Main Study Groups Content */}
             <div className="bg-white rounded-xl shadow-sm p-6">

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/UnifiedAuthContext'
 import { getStudyGroup, leaveStudyGroup, devStudyGroups, StudyGroup } from '@/lib/aws-study-groups'
 import { hasRealAWSConfig } from '@/lib/aws-config'
+import InviteModal from '@/components/InviteModal'
 
 interface StudyGroupPageProps {
   params: {
@@ -18,6 +19,7 @@ export default function StudyGroupPage({ params }: StudyGroupPageProps) {
   const [group, setGroup] = useState<StudyGroup | null>(null)
   const [loadingGroup, setLoadingGroup] = useState(true)
   const [error, setError] = useState('')
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
 
   useEffect(() => {
     if (user && params.id) {
@@ -209,7 +211,10 @@ export default function StudyGroupPage({ params }: StudyGroupPageProps) {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Members ({group.memberCount})</h3>
                 {group.memberCount < group.maxMembers && (
-                  <button className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                  <button 
+                    onClick={() => setIsInviteModalOpen(true)}
+                    className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                  >
                     + Invite
                   </button>
                 )}
@@ -279,6 +284,19 @@ export default function StudyGroupPage({ params }: StudyGroupPageProps) {
           </div>
         </div>
       </div>
+
+      {/* Invite Modal */}
+      <InviteModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+        groupId={group.id}
+        groupName={group.name}
+        inviterId={user?.username || ''}
+        onInviteSent={() => {
+          // Optionally refresh the group data or show a success message
+          console.log('Invite sent successfully')
+        }}
+      />
     </div>
   )
 }
