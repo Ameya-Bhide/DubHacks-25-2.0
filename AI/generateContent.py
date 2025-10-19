@@ -1,3 +1,4 @@
+'''
 import json
 import os
 import boto3
@@ -251,11 +252,11 @@ DO NOT under any circumstance put a beginning sentence describing your task. Mak
             return create_error_response(500, f"An AWS error occurred: {e}")
     except Exception as e:
         return create_error_response(500, f"An unexpected error occurred: {e}")
-
-
-
-
 '''
+
+
+
+
 import json
 import os
 import boto3
@@ -463,7 +464,7 @@ def getContents(file_path: str) -> str:
         return f"Error: Unsupported file type: {file_extension}. Only .txt, .docx, and .pdf are supported."
     
 
-def getKeywords(prompt: str) -> []:
+def getKeywords(prompt: str) -> list:
     mock_event = {
         "body": json.dumps({
             "message": "What key words and topics are associated with this? Seperate all possible ones by new line, in order of relevance: " + prompt,
@@ -502,7 +503,7 @@ def getKeywords(prompt: str) -> []:
         print(f"Error: {e}")
 
 
-def search(file_path: str, prompt: str) -> []:
+def search(file_path: str, prompt: str) -> list:
     keywords = getKeywords(prompt)
     result = []
     with open(file_path, 'r') as file:
@@ -728,18 +729,21 @@ def getFlashCards(file_path: str, num: int):
 
 
 def main():
-    """Runs a continuous loop to chat with the agent from the console."""
-    print("--- Bedrock Agent Test ---")
-    print(f"Using model: {MODEL_ID}")
-    print("Type 'exit' or 'quit' to end.")
-    print("-" * 28)
-    #getSummary("results/englishNotes.txt")
-    #getQuestions("results/YouDreamedOfEmpires.pdf", 3)
-    getFlashCards("results/notes.txt", 10)
-    #file = open("results/questions.txt", "r")
-    #question = file.read().splitlines()
-    #file.close()
-    #checkAnswer("results/YouDreamedOfEmpires.pdf", question[0], "I don't know the answer to this one, can you explain it to me?")
+    with open("user_ai_query.txt", 'r', encoding='utf-8') as f:
+        parameters = f.read().splitlines()
+    f = open("user_ai_response.txt", 'w', encoding='utf-8')
+    if(parameters[0] == "getSummary"):
+        f.write(getSummary(parameters[1]))
+    if(parameters[0] == "getQuestions"):
+        f.write(getQuestions(parameters[1], parameters[2]))
+    if(parameters[0] == "getFlashCards"):
+        f.write(getFlashCards(parameters[1], parameters[2]))
+    if(parameters[0] == "checkAnswer"):
+        f.write(checkAnswer(parameters[1], parameters[2], parameters[3]))
+    if(parameters[0] == "search"):
+        seperator = "\n"
+        f.write(seperator.join(search(parameters[1])))
+    f.close()
 if __name__ == "__main__":
     main()
-    '''
+    
