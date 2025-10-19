@@ -65,17 +65,109 @@ const yaml = require('js-yaml'); // ✅ install this
 //   console.log('✅ make_file completed successfully');
 // }
 
+function add_to_stored_file(data) {
+  try {
+    const docsDir = path.join(os.homedir(), 'Documents', '.stored_files');
+    const filePath = path.join(docsDir, 'stored_files.yaml');
+
+    // Ensure the directory exists
+    if (!fs.existsSync(docsDir)) {
+      fs.mkdirSync(docsDir, { recursive: true });
+    }
+
+    // Load existing YAML (if present)
+    let existingData = [];
+    if (fs.existsSync(filePath)) {
+      const fileContent = fs.readFileSync(filePath, 'utf8');
+      if (fileContent.trim() !== '') {
+        existingData = yaml.load(fileContent);
+      }
+    }
+
+    // Create a new YAML entry
+    const newEntry = {
+      [data["Name of file"]]: [
+        { "File Path": data["File path"] },
+        { "Class Name": data["Class Name"] },
+        { "Study Group Name": data["Study Group Name"] },
+        { "Date Created": data["Date Created"] }
+      ]
+    };
+
+    // Append new entry
+    existingData = existingData || [];
+    existingData.push(newEntry);
+
+    // Write updated YAML back to file
+    const yamlStr = yaml.dump(existingData, { lineWidth: -1 });
+    fs.writeFileSync(filePath, yamlStr, 'utf8');
+
+    console.log(`✅ Successfully added ${data["Name of file"]} to stored_files.yaml`);
+  } catch (err) {
+    console.error('❌ Error adding to file:', err);
+  }
+}
+
+function add_to_shared_file(data) {
+  try {
+    const docsDir = path.join(os.homedir(), 'Documents', '.shared_files');
+    const filePath = path.join(docsDir, 'shared_files.yaml');
+
+    // Ensure the directory exists
+    if (!fs.existsSync(docsDir)) {
+      fs.mkdirSync(docsDir, { recursive: true });
+    }
+
+    // Load existing YAML (if present)
+    let existingData = [];
+    if (fs.existsSync(filePath)) {
+      const fileContent = fs.readFileSync(filePath, 'utf8');
+      if (fileContent.trim() !== '') {
+        existingData = yaml.load(fileContent);
+      }
+    }
+
+    // Create a new YAML entry
+    const newEntry = {
+      [data["Name of file"]]: [
+        { "File Path": data["File path"] },
+        { "Class Name": data["Class Name"] },
+        { "Study Group Name": data["Study Group Name"] },
+        { "Date Created": data["Date Created"] }
+      ]
+    };
+
+    // Append new entry
+    existingData = existingData || [];
+    existingData.push(newEntry);
+
+    // Write updated YAML back to file
+    const yamlStr = yaml.dump(existingData, { lineWidth: -1 });
+    fs.writeFileSync(filePath, yamlStr, 'utf8');
+
+    console.log(`✅ Successfully added ${data["Name of file"]} to shared_files.yaml`);
+  } catch (err) {
+    console.error('❌ Error adding to file:', err);
+  }
+}
+
 function make_file(data) {
   if (!data || typeof data !== 'object') {
     console.error('Invalid input to make_file');
     return;
   }
+  // stored = '.stored_files';
+  // shared = '.shared_files';
+  if (data["Shared"])
+    add_to_shared_file (data);
+  else
+    add_to_stored_file (data);
 
-  file_path = data["File path"];
-  summary_json = get_summary (file_path);
-  add_to_file (data);
-//   new_data = get_summary (data);
-  const new_data = { ...data, ...summary_json };
+//   file_path = data["File path"];
+//   summary_string = get_summary (file_path);
+// //   new_data = get_summary (data);
+//   data["five-sentence summary"] = summary_string;
+  // const new_data = { ...data, ...summary_json };
 
   const homeDir = os.homedir();
   const documentsDir = path.join(homeDir, 'Documents');
@@ -96,9 +188,9 @@ function make_file(data) {
   }
 
   // === 2️⃣ Extract fields ===
-  const filePath = new_data['File path'];
-  const oneSentence = new_data['1-sentence description'] ?? '';
-  const fiveSentence = new_data['five-sentence summary'] ?? '(No five-sentence summary provided)';
+  const filePath = /*new_*/data['File path'];
+  const oneSentence = /*new_*/data['1-sentence description'] ?? '';
+  const fiveSentence = /*new_*/data['five-sentence summary'] ?? '(No five-sentence summary provided)';
 
   if (!filePath) {
     console.error('Missing "File path" in data');
@@ -143,4 +235,4 @@ function make_file(data) {
 }
 
 // Export the function for use elsewhere
-module.exports = { make_file };
+module.exports = { make_file, add_to_stored_file,  add_to_shared_file};

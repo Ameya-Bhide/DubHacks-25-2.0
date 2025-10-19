@@ -2,6 +2,8 @@
 
 const path = require('path');
 const { make_file } = require('../public/make_file');
+const { add_to_stored_file } = require('../public/make_file');
+const { add_to_shared_file } = require('../public/make_file');
 const fs = require('fs');
 const os = require('os');
 const yaml = require('js-yaml'); // ✅ install this
@@ -14,8 +16,8 @@ const data11 = {
   "Class Name": "Calculus 1",
   "Name of file": "notes.pdf",
   "1-sentence description": "Quick notes on limits and derivatives.",
-  "five-sentence summary": "Covers concepts of limits, continuity, derivatives, and examples of rate of change problems. Includes visual understanding of approaching limits. Describes the definition of derivative as a limit. Explains rules like product and quotient rule. Concludes with examples of real-world applications."
-  
+  "five-sentence summary": "Covers concepts of limits, continuity, derivatives, and examples of rate of change problems. Includes visual understanding of approaching limits. Describes the definition of derivative as a limit. Explains rules like product and quotient rule. Concludes with examples of real-world applications.",
+  "Shared": true
 };
 
 const data12 = {
@@ -25,8 +27,8 @@ const data12 = {
   "Class Name": "Mechanics",
   "Name of file": "notes.pdf",
   "1-sentence description": "Quick notes on Newton's Laws.",
-  "five-sentence summary": "Summarizes Newton’s three laws with examples. Discusses inertia and acceleration relationships. Describes how forces cause motion. Provides worked examples with free-body diagrams. Highlights common misconceptions in net force calculations."
-  
+  "five-sentence summary": "Summarizes Newton’s three laws with examples. Discusses inertia and acceleration relationships. Describes how forces cause motion. Provides worked examples with free-body diagrams. Highlights common misconceptions in net force calculations.",
+  "Shared": true
 };
 // Example JSON input
 const data13 = {
@@ -36,8 +38,8 @@ const data13 = {
   "Class Name": "Calculus 1",
   "Name of file": "notes2.pdf",
   "1-sentence description": "Quick notes on limits and derivatives2.",
-  "five-sentence summary": "Explores advanced examples of limits approaching infinity. Covers derivative applications in velocity and acceleration. Discusses higher order derivatives. Includes worked examples of tangent lines. Ends with brief intro to implicit differentiation."
-  
+  "five-sentence summary": "Explores advanced examples of limits approaching infinity. Covers derivative applications in velocity and acceleration. Discusses higher order derivatives. Includes worked examples of tangent lines. Ends with brief intro to implicit differentiation.",
+  "Shared": false
 };
 
 
@@ -152,11 +154,12 @@ function make_files ()
 {
     for (let i = 0; i < datas.length; i++)
         make_file(datas[i]);
+      // add_to_file (datas[i]);
 }
 
-console.log('Running make_file test...');
+console.log('Running add_to_file test...');
 make_files();
 
 // Verify by checking ~/Documents/.ai_helper/descriptions.txt
 // and ~/Documents/.ai_helper/Summaries/.../summary.txt
-console.log('✅ Done. Check your Documents/.ai_helper folder!');
+console.log('✅ Done. Check your Documents/.stored_files and Documents/.shared_files folders!');
