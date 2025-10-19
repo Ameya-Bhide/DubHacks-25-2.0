@@ -1,25 +1,34 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/UnifiedAuthContext'
 import LoginForm from '@/components/LoginForm'
 import SignUpForm from '@/components/SignUpForm'
 import ConfirmSignUpForm from '@/components/ConfirmSignUpForm'
 import CreateGroupModal from '@/components/CreateGroupModal'
-import StudyGroupDetail from '@/components/StudyGroupDetail'
 import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup } from '@/lib/aws-study-groups'
 import { hasRealAWSConfig } from '@/lib/aws-config'
 
 type AuthView = 'login' | 'signup' | 'confirm' | 'forgot'
 
 export default function Home() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [authView, setAuthView] = useState<AuthView>('login')
   const [confirmEmail, setConfirmEmail] = useState('')
   const [activeTab, setActiveTab] = useState('home')
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
   const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([])
-  const [selectedGroup, setSelectedGroup] = useState<StudyGroup | null>(null)
   const { user, loading, signOut } = useAuth()
+
+  // Handle URL tab parameter
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab && ['home', 'ai', 'study-group', 'documents', 'calendar'].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
 
   const handleLogout = async () => {
     try {
@@ -86,24 +95,6 @@ export default function Home() {
     }
   }
 
-  const handleLeaveGroup = async (groupId: string) => {
-    if (!user) return
-
-    try {
-      const isAWS = hasRealAWSConfig()
-      if (isAWS) {
-        await leaveStudyGroup(groupId, user.username)
-      } else {
-        await devStudyGroups.leaveStudyGroup(groupId, user.username)
-      }
-      
-      // Remove the group from the list
-      setStudyGroups(prev => prev.filter(group => group.id !== groupId))
-      console.log('Left study group:', groupId)
-    } catch (error) {
-      console.error('Error leaving study group:', error)
-    }
-  }
 
   if (loading) {
     return (
@@ -415,7 +406,7 @@ export default function Home() {
                   {studyGroups.map(group => (
                     <div 
                       key={group.id} 
-                      onClick={() => setSelectedGroup(group)}
+                      onClick={() => router.push(`/study-group/${group.id}`)}
                       className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                     >
                       <div className="flex items-start justify-between">
@@ -520,6 +511,7 @@ export default function Home() {
         )}
       </main>
 
+
       {/* Create Group Modal */}
       <CreateGroupModal
         isOpen={isCreateGroupOpen}
@@ -527,15 +519,6 @@ export default function Home() {
         onCreateGroup={handleCreateGroup}
       />
 
-      {/* Study Group Detail Modal */}
-      {selectedGroup && (
-        <StudyGroupDetail
-          group={selectedGroup}
-          currentUser={user?.username || ''}
-          onClose={() => setSelectedGroup(null)}
-          onLeaveGroup={handleLeaveGroup}
-        />
-      )}
     </div>
   )
 }

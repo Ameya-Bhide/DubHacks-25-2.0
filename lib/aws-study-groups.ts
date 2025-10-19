@@ -89,26 +89,35 @@ export async function createStudyGroup(groupData: CreateGroupData, createdBy: st
 }
 
 // Get a study group by ID
-export async function getStudyGroup(groupId: string): Promise<StudyGroup | null> {
+export async function getStudyGroup(groupId: string, userId: string): Promise<StudyGroup | null> {
   if (!hasRealAWSConfig()) {
     return devStudyGroups.getStudyGroup(groupId)
   }
 
-  const client = await initializeDynamoDB()
-  if (!client) {
-    return devStudyGroups.getStudyGroup(groupId)
-  }
-
   try {
-    const command = new GetCommand({
-      TableName: TABLE_NAME,
-      Key: { id: groupId }
+    const response = await fetch('/api/study-groups', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'getGroup',
+        data: { groupId, userId }
+      })
     })
 
-    const result = await client.send(command)
-    return result.Item as StudyGroup || null
+    if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error('Access denied: You are not a member of this study group')
+      }
+      throw new Error('Failed to get study group')
+    }
+
+    const result = await response.json()
+    return result.group
   } catch (error) {
     console.error('Error getting study group:', error)
+    console.log('Falling back to dev mode')
     return devStudyGroups.getStudyGroup(groupId)
   }
 }
@@ -204,9 +213,10 @@ export async function joinStudyGroup(groupId: string, userId: string): Promise<S
 }
 
 // Leave a study group
-export async function leaveStudyGroup(groupId: string, userId: string): Promise<StudyGroup> {
+export async function leaveStudyGroup(groupId: string, userId: string): Promise<{ group: StudyGroup | null; deleted: boolean }> {
   if (!hasRealAWSConfig()) {
-    return devStudyGroups.leaveStudyGroup(groupId, userId)
+    const group = await devStudyGroups.leaveStudyGroup(groupId, userId)
+    return { group, deleted: false }
   }
 
   try {
@@ -222,15 +232,19 @@ export async function leaveStudyGroup(groupId: string, userId: string): Promise<
     })
 
     if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error('You are not a member of this study group')
+      }
       throw new Error('Failed to leave study group')
     }
 
     const result = await response.json()
-    return result.group
+    return { group: result.group, deleted: result.deleted }
   } catch (error) {
     console.error('Error leaving study group:', error)
     console.log('Falling back to dev mode')
-    return devStudyGroups.leaveStudyGroup(groupId, userId)
+    const group = await devStudyGroups.leaveStudyGroup(groupId, userId)
+    return { group, deleted: false }
   }
 }
 

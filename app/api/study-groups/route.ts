@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { v4 as uuidv4 } from 'uuid'
 
 // Force dynamic rendering to prevent static generation issues
@@ -61,10 +61,65 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, groups: result.Items || [] })
     }
 
+    if (action === 'getGroup') {
+      const { groupId, userId } = data
+      
+      const command = new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { id: groupId }
+      })
+
+      const result = await docClient.send(command)
+      const group = result.Item
+
+      // Check if user is a member of the group
+      if (!group || !group.members || !group.members.includes(userId)) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Access denied: You are not a member of this study group' 
+        }, { status: 403 })
+      }
+
+      return NextResponse.json({ success: true, group })
+    }
+
     if (action === 'leaveGroup') {
       const { groupId, userId } = data
       
-      const command = new UpdateCommand({
+      // First, get the current group to check member count
+      const getCommand = new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { id: groupId }
+      })
+      
+      const getResult = await docClient.send(getCommand)
+      const group = getResult.Item
+      
+      if (!group || !group.members || !group.members.includes(userId)) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'User is not a member of this group' 
+        }, { status: 403 })
+      }
+      
+      // If this is the last member, delete the group
+      if (group.memberCount === 1) {
+        const deleteCommand = new DeleteCommand({
+          TableName: TABLE_NAME,
+          Key: { id: groupId }
+        })
+        
+        await docClient.send(deleteCommand)
+        return NextResponse.json({ 
+          success: true, 
+          group: null, 
+          deleted: true,
+          message: 'Group deleted as last member left'
+        })
+      }
+      
+      // Otherwise, remove the user from the group
+      const updateCommand = new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { id: groupId },
         UpdateExpression: 'REMOVE members :userId SET memberCount = memberCount - :one',
@@ -76,8 +131,12 @@ export async function POST(request: NextRequest) {
         ReturnValues: 'ALL_NEW'
       })
 
-      const result = await docClient.send(command)
-      return NextResponse.json({ success: true, group: result.Attributes })
+      const result = await docClient.send(updateCommand)
+      return NextResponse.json({ 
+        success: true, 
+        group: result.Attributes,
+        deleted: false
+      })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
