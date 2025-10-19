@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
         members: [createdBy],
         createdBy,
         createdAt: new Date().toISOString(),
-        isActive: true
+        isActive: true,
+        isPublic: groupData.isPublic || false
       }
 
       const command = new PutCommand({

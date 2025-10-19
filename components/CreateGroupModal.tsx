@@ -22,7 +22,8 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup, userP
     maxMembers: 20, // Fixed cap of 20 members
     meetingFrequency: 'weekly',
     meetingDay: 'monday',
-    meetingTime: '18:00'
+    meetingTime: '18:00',
+    isPublic: false
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -121,7 +122,8 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup, userP
         maxMembers: 20, // Fixed cap of 20 members
         meetingFrequency: 'weekly',
         meetingDay: 'monday',
-        meetingTime: '18:00'
+        meetingTime: '18:00',
+        isPublic: false
       })
     } catch (error: any) {
       console.error('Error creating group:', error)
@@ -319,6 +321,32 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup, userP
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Group Visibility */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Group Visibility</h3>
+            
+            <div className="flex items-start space-x-3">
+              <div className="flex items-center h-5">
+                <input
+                  id="isPublic"
+                  name="isPublic"
+                  type="checkbox"
+                  checked={formData.isPublic}
+                  onChange={(e) => setFormData(prev => ({ ...prev, isPublic: e.target.checked }))}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+              </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="isPublic" className="font-medium text-gray-700">
+                  Open to Public
+                </label>
+                <p className="text-gray-500">
+                  Allow other students to discover and join this study group. If unchecked, only invited members can join.
+                </p>
               </div>
             </div>
           </div>

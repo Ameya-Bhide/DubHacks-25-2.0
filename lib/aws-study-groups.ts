@@ -43,6 +43,7 @@ export interface StudyGroup {
   meetingDay: string
   meetingTime: string
   isActive: boolean
+  isPublic: boolean
 }
 
 export interface CreateGroupData {
@@ -53,6 +54,7 @@ export interface CreateGroupData {
   meetingFrequency: string
   meetingDay: string
   meetingTime: string
+  isPublic: boolean
 }
 
 // Create a new study group
@@ -166,9 +168,10 @@ export async function getAllStudyGroups(): Promise<StudyGroup[]> {
   try {
     const command = new ScanCommand({
       TableName: TABLE_NAME,
-      FilterExpression: 'isActive = :active',
+      FilterExpression: 'isActive = :active AND isPublic = :public',
       ExpressionAttributeValues: {
-        ':active': true
+        ':active': true,
+        ':public': true
       }
     })
 
@@ -258,7 +261,8 @@ export const devStudyGroups = {
       members: [createdBy],
       createdBy,
       createdAt: new Date().toISOString(),
-      isActive: true
+      isActive: true,
+      isPublic: groupData.isPublic || false
     }
     
     // Store in localStorage for development
@@ -288,7 +292,8 @@ export const devStudyGroups = {
   getAllStudyGroups: async (): Promise<StudyGroup[]> => {
     if (typeof window === 'undefined') return []
     
-    return JSON.parse(localStorage.getItem('dev-study-groups') || '[]')
+    const allGroups = JSON.parse(localStorage.getItem('dev-study-groups') || '[]')
+    return allGroups.filter((group: StudyGroup) => group.isPublic === true)
   },
 
   joinStudyGroup: async (groupId: string, userId: string): Promise<StudyGroup> => {
