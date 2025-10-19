@@ -13,6 +13,8 @@ export default function Home() {
   const [confirmEmail, setConfirmEmail] = useState('')
   const [activeTab, setActiveTab] = useState('home')
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [showCalendarModal, setShowCalendarModal] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const { user, loading, signOut } = useAuth()
 
   const handleLogout = async () => {
@@ -41,6 +43,43 @@ export default function Home() {
     console.log('Upload form data:', jsonData)
     setShowUploadModal(false)
     // Here you can add logic to actually upload the file or send the data to a server
+  }
+
+  const handleDateClick = (date: Date) => {
+    setSelectedDate(date)
+    setShowCalendarModal(true)
+  }
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const daysInMonth = lastDay.getDate()
+    const startingDayOfWeek = firstDay.getDay()
+    
+    const days = []
+    
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null)
+    }
+    
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(new Date(year, month, day))
+    }
+    
+    return days
+  }
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
   }
 
   if (loading) {
@@ -356,18 +395,46 @@ export default function Home() {
         {/* Calendar Tab Content */}
         {activeTab === 'calendar' && (
           <div className="bg-white rounded-xl shadow-sm p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Calendar</h2>
-            <div className="text-center py-12">
-              <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Calendar</h2>
+              <div className="text-lg font-medium text-gray-700">
+                {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Schedule Your Study Sessions</h3>
-              <p className="text-gray-600 mb-6">Plan and manage your study schedule and group meetings.</p>
-              <button className="bg-purple-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-purple-700 transition duration-200">
-                View Calendar
-              </button>
+            </div>
+            
+            {/* Calendar Grid */}
+            <div className="grid grid-cols-7 gap-1 mb-4">
+              {/* Day headers */}
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                <div key={day} className="p-2 text-center text-sm font-medium text-gray-500 bg-gray-50 rounded">
+                  {day}
+                </div>
+              ))}
+              
+              {/* Calendar days */}
+              {getDaysInMonth(new Date()).map((day, index) => (
+                <div
+                  key={index}
+                  className={`p-2 text-center text-sm rounded cursor-pointer transition duration-200 ${
+                    day
+                      ? 'hover:bg-blue-100 hover:text-blue-700 text-gray-900'
+                      : 'text-gray-300'
+                  } ${
+                    day && day.getDate() === new Date().getDate() && 
+                    day.getMonth() === new Date().getMonth() && 
+                    day.getFullYear() === new Date().getFullYear()
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : ''
+                  }`}
+                  onClick={() => day && handleDateClick(day)}
+                >
+                  {day ? day.getDate() : ''}
+                </div>
+              ))}
+            </div>
+            
+            <div className="text-center text-sm text-gray-500 mt-4">
+              Click on any date to view study group meetups and uploaded files
             </div>
           </div>
         )}
@@ -497,6 +564,70 @@ export default function Home() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Calendar Modal */}
+      {showCalendarModal && selectedDate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Date Details</h3>
+              <button
+                onClick={() => setShowCalendarModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition duration-200"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold text-gray-800 mb-2">
+                {formatDate(selectedDate)}
+              </h4>
+            </div>
+
+            {/* Study Group Meetups Section */}
+            <div className="mb-6">
+              <h5 className="text-md font-medium text-gray-700 mb-3 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Study Group Meetups
+              </h5>
+              <div className="bg-gray-50 rounded-lg p-4 text-center">
+                <div className="text-gray-500 text-sm">
+                  No study group meetups scheduled for this date
+                </div>
+              </div>
+            </div>
+
+            {/* Uploaded Files Section */}
+            <div className="mb-6">
+              <h5 className="text-md font-medium text-gray-700 mb-3 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Uploaded Files
+              </h5>
+              <div className="bg-gray-50 rounded-lg p-4 text-center">
+                <div className="text-gray-500 text-sm">
+                  No files uploaded on this date
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowCalendarModal(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
