@@ -2,8 +2,6 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { hasRealAWSConfig } from '@/lib/aws-config'
-import { loadAWSModules } from '@/lib/aws-loader'
-import { createUserProfile } from '@/lib/aws-user-profiles'
 
 interface User {
   username: string
@@ -36,25 +34,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAWSMode, setIsAWSMode] = useState(false)
 
   useEffect(() => {
-    // Check if we have real AWS configuration
-    const hasAWS = hasRealAWSConfig()
-    const awsFailed = localStorage.getItem('aws-amplify-failed') === 'true'
-    
-    if (hasAWS && !awsFailed) {
-      console.log('🔐 Attempting AWS Cognito authentication')
-      setIsAWSMode(true)
-      // Initialize AWS auth with fallback
-      initializeAWSAuth()
-    } else {
-      if (awsFailed) {
-        console.log('🛠️ AWS Amplify previously failed, using development authentication')
+    const initializeAuth = async () => {
+      if (hasRealAWSConfig()) {
+        console.log('🔐 Using AWS authentication')
+        setIsAWSMode(true)
+        await initializeAWSAuth()
       } else {
         console.log('🛠️ Using development authentication')
+        setIsAWSMode(false)
+        setLoading(false)
+        initializeDevAuth()
       }
-      setIsAWSMode(false)
-      // Initialize dev auth
-      initializeDevAuth()
     }
+    
+    initializeAuth()
   }, [])
 
   const initializeAWSAuth = async () => {
@@ -62,6 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Load AWS modules using the reliable loader
       let awsAuthModule, awsUtilsModule
       try {
+        // Dynamically import AWS modules only when needed
+        const { loadAWSModules } = await import('@/lib/aws-loader')
         const modules = await loadAWSModules()
         awsAuthModule = modules.auth
         awsUtilsModule = modules.utils
@@ -153,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // If signup was successful, create user profile in DynamoDB
           if (cognitoResult && !cognitoResult.isSignUpComplete) {
             try {
+              const { createUserProfile } = await import('@/lib/aws-user-profiles')
               await createUserProfile({
                 userId: email, // Use email as user ID
                 email,
@@ -249,6 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUp: async (email: string, password: string, givenName: string, familyName: string, university: string, className: string) => {
           // Create user profile in DynamoDB (dev mode uses localStorage)
           try {
+            const { createUserProfile } = await import('@/lib/aws-user-profiles')
             await createUserProfile({
               userId: email,
               email,

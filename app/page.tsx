@@ -7,12 +7,14 @@ import LoginForm from '@/components/LoginForm'
 import SignUpForm from '@/components/SignUpForm'
 import ConfirmSignUpForm from '@/components/ConfirmSignUpForm'
 import CreateGroupModal from '@/components/CreateGroupModal'
+import MeetingScheduler from '@/components/MeetingScheduler'
 import InviteCard from '@/components/InviteCard'
+import InviteModal from '@/components/InviteModal'
 import FileNotifications from '@/components/FileNotifications'
 import DocumentCard from '@/components/DocumentCard'
 import OpenFileModal from '@/components/OpenFileModal'
-import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup } from '@/lib/aws-study-groups'
-import { hasRealAWSConfig } from '@/lib/aws-config'
+import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup, devMeetings, Meeting, getInvitesForEmail, getAllInvites, respondToInvite, deleteInvite, sendInvite, getAllStudyGroups, joinStudyGroup } from '@/lib/aws-study-groups'
+import { hasRealAWSConfig, checkDynamoDBConfigFromBrowser, isElectron } from '@/lib/aws-config'
 import { getUserProfile, UserProfile } from '@/lib/aws-user-profiles'
 
 type AuthView = 'login' | 'signup' | 'confirm' | 'forgot'
@@ -31,9 +33,16 @@ export default function Home() {
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false)
   const [showEmailSentModal, setShowEmailSentModal] = useState(false)
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('')
+  const [isMeetingSchedulerOpen, setIsMeetingSchedulerOpen] = useState(false)
+  const [selectedGroupForMeeting, setSelectedGroupForMeeting] = useState<StudyGroup | null>(null)
+  const [selectedGroupForDetails, setSelectedGroupForDetails] = useState<StudyGroup | null>(null)
+  const [isGroupDetailsOpen, setIsGroupDetailsOpen] = useState(false)
+  const [groupMeetings, setGroupMeetings] = useState<Meeting[]>([])
   const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([])
   const [invites, setInvites] = useState<any[]>([])
   const [showInvites, setShowInvites] = useState(false)
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [selectedGroupForInvite, setSelectedGroupForInvite] = useState<StudyGroup | null>(null)
   const [showFileNotifications, setShowFileNotifications] = useState(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [documents, setDocuments] = useState<any[]>([])
@@ -264,19 +273,17 @@ export default function Home() {
     if (!user) return
 
     try {
-      const isAWS = hasRealAWSConfig()
-      const groups = isAWS
-        ? await getUserStudyGroups(user.username) // Real AWS call
-        : await devStudyGroups.getUserStudyGroups(user.username)
-
+      // Always use AWS DynamoDB (no localStorage fallback)
+      const groups = await getUserStudyGroups(user.username)
       setStudyGroups(groups)
       
       // Debug: Log all groups to console
       console.log('📊 All Study Groups:', groups)
-      if (isAWS) {
-        console.log('🔗 AWS Mode - Data loaded from DynamoDB')
+      const isElectronEnv = isElectron()
+      if (isElectronEnv) {
+        console.log('🖥️ Electron Mode - Data loaded from AWS DynamoDB')
       } else {
-        console.log('💾 Dev Mode - Data stored in localStorage')
+        console.log('🔗 Browser Mode - Data loaded from AWS DynamoDB')
       }
     } catch (error) {
       console.error('Error loading study groups:', error)
@@ -287,20 +294,25 @@ export default function Home() {
     if (!user) return
 
     try {
-      const response = await fetch('/api/study-groups', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'getUserInvites',
-          data: { userId: user.username }
-        })
-      })
-
-      const result = await response.json()
-      if (result.success) {
-        setInvites(result.invites)
+      // Always use AWS DynamoDB (no localStorage fallback)
+      const userEmail = user.email || `${user.username}@example.com`
+      
+      console.log('Loading invites for user email:', userEmail)
+      
+      // Get all invites for the user from AWS DynamoDB
+      const allUserInvites = await getInvitesForEmail(userEmail)
+      console.log('Found invites for user:', allUserInvites)
+      
+      // Just show all invites for now - don't filter automatically
+      // The user can manually clean up outdated invites using the cleanup button
+      console.log('All user invites (no filtering):', allUserInvites)
+      setInvites(allUserInvites)
+      
+      const isElectronEnv = isElectron()
+      if (isElectronEnv) {
+        console.log('🖥️ Electron Mode - Data loaded from AWS DynamoDB')
+      } else {
+        console.log('🔗 Browser Mode - Data loaded from AWS DynamoDB')
       }
     } catch (error) {
       console.error('Error loading invites:', error)
@@ -324,12 +336,20 @@ export default function Home() {
 
     setDocumentsLoading(true)
     try {
+      // Always use API routes (works in both browser and Electron)
       const response = await fetch(`/api/ai-helper-files?userId=${user.username}&action=getUserFiles`)
       const result = await response.json()
       
       if (result.success) {
         setDocuments(result.files)
         console.log('📄 Documents loaded from .ai_helper:', result.files)
+        
+        const isElectronEnv = isElectron()
+        if (isElectronEnv) {
+          console.log('🖥️ Electron Mode - Documents loaded from AWS')
+        } else {
+          console.log('🔗 Browser Mode - Documents loaded from AWS')
+        }
       } else {
         console.error('Error loading documents:', result.error)
       }
@@ -372,7 +392,7 @@ export default function Home() {
           application: application
         })
       })
-      
+
       const result = await response.json()
       
       if (result.success) {
@@ -423,35 +443,21 @@ export default function Home() {
     if (!user) return
 
     try {
-      const apiResponse = await fetch('/api/study-groups', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'respondToInvite',
-          data: { 
-            inviteId, 
-            userId: user.username, 
-            response 
-          }
-        })
-      })
-
-      const result = await apiResponse.json()
-      if (result.success) {
+      // Update invite status using the appropriate data source (AWS or localStorage)
+      await respondToInvite(inviteId, response, user.username)
+      
         // Remove the invite from the list
         setInvites(prev => prev.filter(invite => invite.id !== inviteId))
         
-        // If accepted, reload study groups
-        if (response === 'accept') {
-          loadStudyGroups()
-        }
-        
-        alert(result.message)
-      } else {
-        alert(result.error || 'Failed to respond to invite')
+      // Note: The respondToInvite function already handles adding the user to the group
+      // when the response is 'accept', so we don't need to call joinStudyGroup separately
+      
+      // Reload study groups to show the new membership if accepted
+      if (response === 'accept') {
+        loadStudyGroups()
       }
+      
+      alert(`Invite ${response}ed successfully!`)
     } catch (error) {
       console.error('Error responding to invite:', error)
       alert('Failed to respond to invite')
@@ -462,17 +468,16 @@ export default function Home() {
     if (!user) return
 
     try {
-      const isAWS = hasRealAWSConfig()
-      const newGroup = isAWS
-        ? await createStudyGroup(groupData, user.username) // Real AWS call
-        : await devStudyGroups.createStudyGroup(groupData, user.username)
+      // Always use AWS DynamoDB (no localStorage fallback)
+      const newGroup = await createStudyGroup({ ...groupData, createdBy: user.username })
       
       setStudyGroups(prev => [newGroup, ...prev])
       console.log('Study group created:', newGroup)
-      if (isAWS) {
-        console.log('🔗 AWS Mode - Group saved to DynamoDB')
+      const isElectronEnv = isElectron()
+      if (isElectronEnv) {
+        console.log('🖥️ Electron Mode - Group saved to AWS DynamoDB')
       } else {
-        console.log('💾 Dev Mode - Group saved to localStorage')
+        console.log('🔗 Browser Mode - Group saved to AWS DynamoDB')
       }
     } catch (error) {
       console.error('Error creating study group:', error)
@@ -503,6 +508,91 @@ export default function Home() {
     setShowEmailSentModal(false)
     setForgotPasswordEmail('')
     setAuthView('login')
+  }
+
+  const handleScheduleMeeting = (group: StudyGroup) => {
+    setSelectedGroupForMeeting(group)
+    setIsMeetingSchedulerOpen(true)
+  }
+
+  const handleMeetingSubmit = async (meetingData: any) => {
+    try {
+      console.log('Scheduling meeting:', meetingData)
+      
+      // Refresh meetings list for the current group
+      if (selectedGroupForDetails) {
+        const meetings = await devMeetings.getMeetingsForGroup(selectedGroupForDetails.id)
+        setGroupMeetings(meetings)
+      }
+      
+      alert(`Meeting "${meetingData.title}" scheduled for ${meetingData.date} at ${meetingData.time}`)
+    } catch (error) {
+      console.error('Error scheduling meeting:', error)
+    }
+  }
+
+  const handleInviteMembers = (group: StudyGroup) => {
+    setSelectedGroupForInvite(group)
+    setIsInviteModalOpen(true)
+  }
+
+  const handleInviteSent = () => {
+    // Refresh invites list
+    loadInvites()
+  }
+
+  const handleStudyGroupClick = async (group: StudyGroup) => {
+    setSelectedGroupForDetails(group)
+    setIsGroupDetailsOpen(true)
+    
+    // Load meetings for this group
+    try {
+      const meetings = await devMeetings.getMeetingsForGroup(group.id)
+      setGroupMeetings(meetings)
+    } catch (error) {
+      console.error('Error loading meetings:', error)
+      setGroupMeetings([])
+    }
+  }
+
+  const handleLeaveGroup = async (group: StudyGroup) => {
+    if (!user) return
+
+    const confirmMessage = group.memberCount === 1 
+      ? `Are you sure you want to leave "${group.name}"? This will delete the group since you are the last member.`
+      : `Are you sure you want to leave "${group.name}"?`
+
+    if (confirm(confirmMessage)) {
+      try {
+        // Use AWS DynamoDB API
+        const result = await leaveStudyGroup(group.id, user.username)
+        
+        if (result.deleted) {
+          alert('You have left the group and it has been deleted.')
+        } else {
+          alert('You have successfully left the group.')
+        }
+        
+        // Reload study groups
+        loadStudyGroups()
+        // Close the modal
+        setIsGroupDetailsOpen(false)
+        setSelectedGroupForDetails(null)
+      } catch (error) {
+        console.error('Error leaving study group:', error)
+        alert('Failed to leave study group')
+      }
+    }
+  }
+
+  const handleTogglePublic = async (group: StudyGroup) => {
+    if (!user || group.createdBy !== user.username) {
+      alert('Only the group creator can change the public setting.')
+      return
+    }
+
+    // TODO: Implement API endpoint for updating group settings
+    alert('Group settings update not yet implemented. This feature will be available soon.')
   }
 
   if (loading) {
@@ -994,7 +1084,7 @@ export default function Home() {
                   {studyGroups.map(group => (
                     <div 
                       key={group.id} 
-                      onClick={() => router.push(`/study-group/${group.id}`)}
+                      onClick={() => handleStudyGroupClick(group)}
                       className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                     >
                       <div className="flex items-start justify-between">
@@ -1010,9 +1100,9 @@ export default function Home() {
                             </span>
                             <span className="flex items-center">
                               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                               </svg>
-                              {group.meetingFrequency} • {group.meetingDay} at {group.meetingTime}
+                              {group.university}
                             </span>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               group.subject === 'Computer Science' ? 'bg-blue-100 text-blue-800' :
@@ -1024,7 +1114,19 @@ export default function Home() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleScheduleMeeting(group)
+                            }}
+                            className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Schedule Meeting
+                          </button>
                           <div className="flex -space-x-2">
                             {group.members.slice(0, 3).map((member, index) => (
                               <div
@@ -1057,6 +1159,10 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
             </button>
+
+
+
+
           </div>
         )}
 
@@ -1094,21 +1200,21 @@ export default function Home() {
                 <p className="text-gray-600">Loading documents...</p>
               </div>
             ) : documents.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents Yet</h3>
-                <p className="text-gray-600 mb-6">Upload and organize your study materials, notes, and resources.</p>
-                <button 
-                  onClick={() => setShowUploadModal(true)}
-                  className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition duration-200"
-                >
-                  Upload Documents
-                </button>
+            <div className="text-center py-12">
+              <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
               </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents Yet</h3>
+              <p className="text-gray-600 mb-6">Upload and organize your study materials, notes, and resources.</p>
+              <button 
+                onClick={() => setShowUploadModal(true)}
+                className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-green-700 transition duration-200"
+              >
+                Upload Documents
+              </button>
+            </div>
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
@@ -1442,6 +1548,20 @@ export default function Home() {
         } : undefined}
       />
 
+      {/* Meeting Scheduler Modal */}
+      {selectedGroupForMeeting && (
+        <MeetingScheduler
+          isOpen={isMeetingSchedulerOpen}
+          onClose={() => {
+            setIsMeetingSchedulerOpen(false)
+            setSelectedGroupForMeeting(null)
+          }}
+          onScheduleMeeting={handleMeetingSubmit}
+          groupId={selectedGroupForMeeting.id}
+          groupName={selectedGroupForMeeting.name}
+        />
+      )}
+
       {/* File Notifications Modal */}
       <FileNotifications
         userId={user?.username || ''}
@@ -1462,15 +1582,19 @@ export default function Home() {
         onOpen={handleOpenConfirm}
       />
 
-      {/* Flashcards Modal */}
-      {showFlashcardsModal && (
+      {/* Study Group Details Modal */}
+      {selectedGroupForDetails && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Generate Flashcards</h3>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-900">{selectedGroupForDetails.name}</h2>
               <button
-                onClick={() => setShowFlashcardsModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition duration-200"
+                onClick={() => {
+                  setIsGroupDetailsOpen(false)
+                  setSelectedGroupForDetails(null)
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1478,210 +1602,224 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Study Group:
-                </label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select a study group</option>
-                  <option value="Personal">Personal</option>
-                  {studyGroups.map(group => (
-                    <option key={group.id} value={group.name}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date Range:
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">From:</label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Main Content */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Group Info */}
+                  <div className="bg-gray-50 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Group Information</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Description:</span>
+                        <p className="text-gray-900 mt-1">{selectedGroupForDetails?.description}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Subject:</span>
+                        <p className="text-gray-900 mt-1">{selectedGroupForDetails?.subject}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">University:</span>
+                        <p className="text-gray-900 mt-1">{selectedGroupForDetails?.university}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Class:</span>
+                        <p className="text-gray-900 mt-1">{selectedGroupForDetails?.className}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Created:</span>
+                        <p className="text-gray-900 mt-1">{selectedGroupForDetails?.createdAt ? new Date(selectedGroupForDetails.createdAt).toLocaleDateString() : ''}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">To:</label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+
+                  {/* Scheduled Meetings */}
+                  <div className="bg-gray-50 rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Scheduled Meetings</h3>
+                      <button 
+                        onClick={() => {
+                          setIsGroupDetailsOpen(false)
+                          setSelectedGroupForDetails(null)
+                          if (selectedGroupForDetails) {
+                            handleScheduleMeeting(selectedGroupForDetails)
+                          }
+                        }}
+                        className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                      >
+                        + Schedule Meeting
+                      </button>
+                    </div>
+                    {groupMeetings.length === 0 ? (
+                      <div className="text-center py-8">
+                        <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <p className="text-gray-600 text-sm">No meetings scheduled yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {groupMeetings.map((meeting) => (
+                          <div key={meeting.id} className="bg-white rounded-lg p-4 border border-gray-200">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-900 mb-1">{meeting.title}</h4>
+                                {meeting.description && (
+                                  <p className="text-gray-600 text-sm mb-2">{meeting.description}</p>
+                                )}
+                                <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                  <span className="flex items-center">
+                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    {new Date(meeting.date).toLocaleDateString()} at {meeting.time}
+                                  </span>
+                                  <span className="flex items-center">
+                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {meeting.duration} min
+                                  </span>
+                                  <span className="flex items-center">
+                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    {meeting.meetingType === 'in-person' ? 'In-Person' : 'Online'}
+                                  </span>
+                                </div>
+                                <p className="text-gray-600 text-sm mt-2">{meeting.location}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
 
-              <div className="flex space-x-3 pt-4">
-                <button
-                  onClick={() => setShowFlashcardsModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200"
-                >
-                  Generate Flashcards
-                </button>
+                {/* Sidebar */}
+                <div className="space-y-6">
+                  {/* Members */}
+                  <div className="bg-gray-50 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Members ({selectedGroupForDetails?.memberCount}/{selectedGroupForDetails?.maxMembers})</h3>
+                    <div className="space-y-3">
+                      {selectedGroupForDetails?.members.map((member, index) => (
+                        <div key={index} className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-medium text-blue-600">
+                              {member.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="text-sm text-gray-900">{member}</span>
+                          {member === selectedGroupForDetails?.createdBy && (
+                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                              Creator
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Group Settings */}
+                  <div className="bg-gray-50 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Group Settings</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Public Group</span>
+                        {user && selectedGroupForDetails?.createdBy === user.username ? (
+                          <button
+                            onClick={() => selectedGroupForDetails && handleTogglePublic(selectedGroupForDetails)}
+                            className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                              selectedGroupForDetails?.isPublic 
+                                ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                            }`}
+                          >
+                            {selectedGroupForDetails?.isPublic ? 'Public' : 'Private'}
+                          </button>
+                        ) : (
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            selectedGroupForDetails?.isPublic 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {selectedGroupForDetails?.isPublic ? 'Public' : 'Private'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Status</span>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          selectedGroupForDetails?.isActive 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {selectedGroupForDetails?.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  {user && selectedGroupForDetails?.members.includes(user.username) && (
+                    <div className="bg-gray-50 rounded-xl p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => selectedGroupForDetails && handleInviteMembers(selectedGroupForDetails)}
+                          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Invite Members
+                        </button>
+                        <button
+                          onClick={() => selectedGroupForDetails && handleLeaveGroup(selectedGroupForDetails)}
+                          className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                          Leave Group
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Summaries Modal */}
-      {showSummariesModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Generate Summaries</h3>
-              <button
-                onClick={() => setShowSummariesModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition duration-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Study Group:
-                </label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="">Select a study group</option>
-                  <option value="Personal">Personal</option>
-                  {studyGroups.map(group => (
-                    <option key={group.id} value={group.name}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date Range:
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">From:</label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">To:</label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  onClick={() => setShowSummariesModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-200"
-                >
-                  Generate Summary
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Invite Modal */}
+      {selectedGroupForInvite && (
+        <InviteModal
+          isOpen={isInviteModalOpen}
+          onClose={() => {
+            setIsInviteModalOpen(false)
+            setSelectedGroupForInvite(null)
+          }}
+          groupId={String(selectedGroupForInvite.id)}
+          groupName={selectedGroupForInvite.name}
+          inviterId={user?.username || ''}
+          inviterName={user?.username || ''}
+          onInviteSent={handleInviteSent}
+        />
       )}
 
-      {/* Practice Questions Modal */}
-      {showPracticeQuestionsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Generate Practice Questions</h3>
-              <button
-                onClick={() => setShowPracticeQuestionsModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition duration-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Study Group:
-                </label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="">Select a study group</option>
-                  <option value="Personal">Personal</option>
-                  {studyGroups.map(group => (
-                    <option key={group.id} value={group.name}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date Range:
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">From:</label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">To:</label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  onClick={() => setShowPracticeQuestionsModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-200"
-                >
-                  Generate Questions
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Meeting Scheduler Modal */}
+      {selectedGroupForMeeting && (
+        <MeetingScheduler
+          isOpen={isMeetingSchedulerOpen}
+          onClose={() => {
+            setIsMeetingSchedulerOpen(false)
+            setSelectedGroupForMeeting(null)
+          }}
+          groupId={String(selectedGroupForMeeting.id)}
+          groupName={selectedGroupForMeeting.name}
+          onScheduleMeeting={handleMeetingSubmit}
+        />
       )}
     </div>
   )
