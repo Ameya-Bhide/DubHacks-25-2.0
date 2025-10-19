@@ -115,7 +115,15 @@ function make_file(data) {
   // === 3️⃣ Update YAML structure ===
   descriptions[expandedFilePath] = {
     one_sentence: oneSentence,
-    five_sentence: fiveSentence
+    five_sentence: fiveSentence,
+    date_created: new_data['Date Created'],
+    study_group_name: new_data['Study Group Name'],
+    class_name: new_data['Class Name'],
+    uploaded_by: 'current-user', // Will be updated with actual user
+    uploaded_at: new Date().toISOString(),
+    file_size: 0, // Will be updated when file is actually uploaded
+    file_type: 'application/octet-stream', // Will be updated when file is actually uploaded
+    is_personal: new_data['Study Group Name'] === 'Personal'
   };
 
   // Write back YAML

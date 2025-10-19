@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Listen for auth events
-      const unsubscribe = Hub.listen('auth', ({ payload }) => {
+      const unsubscribe = Hub.listen('auth', ({ payload }: { payload: any }) => {
         console.log('Auth event:', payload.event, payload)
         switch (payload.event) {
           case 'signedIn':
