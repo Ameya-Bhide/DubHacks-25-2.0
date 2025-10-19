@@ -729,21 +729,24 @@ def getFlashCards(file_path: str, num: int):
 
 
 def main():
-    with open("user_ai_query.txt", 'r', encoding='utf-8') as f:
-        parameters = f.read().splitlines()
-    f = open("user_ai_response.txt", 'w', encoding='utf-8')
-    if(parameters[0] == "getSummary"):
-        f.write(getSummary(parameters[1]))
-    if(parameters[0] == "getQuestions"):
-        f.write(getQuestions(parameters[1], parameters[2]))
-    if(parameters[0] == "getFlashCards"):
-        f.write(getFlashCards(parameters[1], parameters[2]))
-    if(parameters[0] == "checkAnswer"):
-        f.write(checkAnswer(parameters[1], parameters[2], parameters[3]))
-    if(parameters[0] == "search"):
-        seperator = "\n"
-        f.write(seperator.join(search(parameters[1])))
-    f.close()
+    try:
+        with open("user_ai_query.txt", 'r', encoding='utf-8') as f:
+            parameters = f.read().splitlines()
+        f = open("user_ai_response.txt", 'w', encoding='utf-8')
+        if(parameters[0] == "getSummary"):
+            f.write(getSummary(parameters[1]))
+        if(parameters[0] == "getQuestions"):
+            f.write(getQuestions(parameters[1], parameters[2]))
+        if(parameters[0] == "getFlashCards"):
+            f.write(getFlashCards(parameters[1], parameters[2]))
+        if(parameters[0] == "checkAnswer"):
+            f.write(checkAnswer(parameters[1], parameters[2], parameters[3]))
+        if(parameters[0] == "search"):
+            seperator = "\n"
+            f.write(seperator.join(search(parameters[1])))
+        f.close()
+    except Exception: 
+        return
 if __name__ == "__main__":
     main()
     
