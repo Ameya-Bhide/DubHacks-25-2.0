@@ -120,14 +120,17 @@ export async function POST(request: NextRequest) {
       }
       
       // Otherwise, remove the user from the group
+      // Create a new members list without the user
+      const updatedMembers = group.members.filter((member: string) => member !== userId)
+      
       const updateCommand = new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { id: groupId },
-        UpdateExpression: 'SET members = list_remove(members, :index), memberCount = memberCount - :one',
+        UpdateExpression: 'SET members = :updatedMembers, memberCount = memberCount - :one',
         ConditionExpression: 'contains(members, :userId)',
         ExpressionAttributeValues: {
           ':userId': userId,
-          ':index': group.members.indexOf(userId), // Get the index of the user in the list
+          ':updatedMembers': updatedMembers,
           ':one': 1
         },
         ReturnValues: 'ALL_NEW'
