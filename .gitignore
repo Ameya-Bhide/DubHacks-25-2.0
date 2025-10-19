@@ -37,3 +37,20 @@ next-env.d.ts
 # electron
 /dist
 /out
+
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+.venv/
+*env/
+
+# Secrets
+.env
+
+# AWS & IDE
+.aws/
+.vscode/
+.idea/
