@@ -14,6 +14,9 @@ import FileNotifications from '@/components/FileNotifications'
 import DocumentCard from '@/components/DocumentCard'
 import OpenFileModal from '@/components/OpenFileModal'
 import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup, devMeetings, Meeting, getInvitesForEmail, getAllInvites, respondToInvite, deleteInvite, sendInvite, getAllStudyGroups, joinStudyGroup } from '@/lib/aws-study-groups'
+
+// Extended meeting type with group name
+type MeetingWithGroupName = Meeting & { groupName: string }
 import { hasRealAWSConfig, checkDynamoDBConfigFromBrowser, isElectron } from '@/lib/aws-config'
 import { getUserProfile, UserProfile } from '@/lib/aws-user-profiles'
 
@@ -38,6 +41,7 @@ export default function Home() {
   const [selectedGroupForDetails, setSelectedGroupForDetails] = useState<StudyGroup | null>(null)
   const [isGroupDetailsOpen, setIsGroupDetailsOpen] = useState(false)
   const [groupMeetings, setGroupMeetings] = useState<Meeting[]>([])
+  const [upcomingMeetings, setUpcomingMeetings] = useState<MeetingWithGroupName[]>([])
   const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([])
   const [invites, setInvites] = useState<any[]>([])
   const [showInvites, setShowInvites] = useState(false)
@@ -283,6 +287,9 @@ export default function Home() {
       const groups = await getUserStudyGroups(user.username)
       setStudyGroups(groups)
       
+      // Load upcoming meetings after study groups are loaded
+      await loadUpcomingMeetings(groups)
+      
       // Debug: Log all groups to console
       console.log('📊 All Study Groups:', groups)
       const isElectronEnv = isElectron()
@@ -363,6 +370,44 @@ export default function Home() {
       console.error('Error loading documents:', error)
     } finally {
       setDocumentsLoading(false)
+    }
+  }
+
+  const loadUpcomingMeetings = async (groups?: StudyGroup[]) => {
+    const groupsToUse = groups || studyGroups
+    if (!user || groupsToUse.length === 0) return
+
+    try {
+      const allMeetings: MeetingWithGroupName[] = []
+      
+      // Get meetings from all study groups
+      for (const group of groupsToUse) {
+        const meetings = await devMeetings.getMeetingsForGroup(group.id)
+        // Add group name to each meeting
+        const meetingsWithGroupName = meetings.map(meeting => ({
+          ...meeting,
+          groupName: group.name
+        }))
+        allMeetings.push(...meetingsWithGroupName)
+      }
+      
+      // Filter for upcoming meetings and sort by date
+      const now = new Date()
+      const upcoming = allMeetings
+        .filter(meeting => {
+          const meetingDate = new Date(`${meeting.date}T${meeting.time}`)
+          return meetingDate > now
+        })
+        .sort((a, b) => {
+          const dateA = new Date(`${a.date}T${a.time}`)
+          const dateB = new Date(`${b.date}T${b.time}`)
+          return dateA.getTime() - dateB.getTime()
+        })
+        .slice(0, 3) // Get only the 3 closest
+      
+      setUpcomingMeetings(upcoming)
+    } catch (error) {
+      console.error('Error loading upcoming meetings:', error)
     }
   }
 
@@ -530,6 +575,9 @@ export default function Home() {
         const meetings = await devMeetings.getMeetingsForGroup(selectedGroupForDetails.id)
         setGroupMeetings(meetings)
       }
+      
+      // Refresh upcoming meetings
+      await loadUpcomingMeetings()
       
       alert(`Meeting "${meetingData.title}" scheduled for ${meetingData.date} at ${meetingData.time}`)
     } catch (error) {
@@ -1090,17 +1138,53 @@ export default function Home() {
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {/* Upcoming Sessions */}
+              {/* Upcoming Dates */}
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Sessions</h3>
-                <div className="text-center py-8">
-                  <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Dates</h3>
+                {upcomingMeetings.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-600 text-sm">No upcoming meetings</p>
                   </div>
-                  <p className="text-gray-600 text-sm">No upcoming sessions</p>
-                </div>
+                ) : (
+                  <div className="space-y-3">
+                    {upcomingMeetings.map(meeting => (
+                      <div key={meeting.id} className="border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm">{meeting.title}</h4>
+                            <p className="text-xs text-gray-600 mt-1">{meeting.groupName}</p>
+                            <div className="flex items-center space-x-2 mt-2 text-xs text-gray-500">
+                              <span className="flex items-center">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                {new Date(meeting.date).toLocaleDateString()}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {meeting.time}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                {meeting.meetingType === 'in-person' ? 'In-Person' : 'Online'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Quick Actions */}
