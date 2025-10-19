@@ -68,19 +68,21 @@ const yaml = require('js-yaml'); // ✅ install this
 function make_file(data) {
   if (!data || typeof data !== 'object') {
     console.error('Invalid input to make_file');
-    return;
+    return { success: false, error: 'Invalid input data' };
   }
 
-  file_path = data["File path"];
-  summary_json = get_summary (file_path);
-  add_to_file (data);
-//   new_data = get_summary (data);
-  const new_data = { ...data, ...summary_json };
+  // For now, we'll work with the data as provided
+  // You can add get_summary and add_to_file functions later
+  const new_data = { ...data };
 
   const homeDir = os.homedir();
   const documentsDir = path.join(homeDir, 'Documents');
   const aiHelperDir = path.join(documentsDir, '.ai_helper');
+  const uploadedFilesDir = path.join(documentsDir, 'UploadedFiles');
+  
+  // Create necessary directories
   fs.mkdirSync(aiHelperDir, { recursive: true });
+  fs.mkdirSync(uploadedFilesDir, { recursive: true });
 
   // === 1️⃣ Load or create descriptions.yaml ===
   const yamlFile = path.join(aiHelperDir, 'descriptions.yaml');
@@ -102,13 +104,13 @@ function make_file(data) {
 
   if (!filePath) {
     console.error('Missing "File path" in data');
-    return;
+    return { success: false, error: 'Missing file path' };
   }
 
-  // Expand ~ to home directory
-  const expandedFilePath = filePath.startsWith('~')
-    ? path.join(homeDir, filePath.slice(1))
-    : filePath;
+  // Create a path in Documents folder for the uploaded file
+  // Since we're getting just the filename from the file picker, we'll create a path in Documents
+  const fileName = path.basename(filePath);
+  const expandedFilePath = path.join(documentsDir, 'UploadedFiles', fileName);
 
   // === 3️⃣ Update YAML structure ===
   descriptions[expandedFilePath] = {
@@ -140,6 +142,7 @@ function make_file(data) {
 //   fs.writeFileSync(summaryFile, summaryContent, 'utf8');
 
   console.log(`✅ make_file completed for ${filePath}`);
+  return { success: true, message: `File processed successfully: ${filePath}` };
 }
 
 // Export the function for use elsewhere

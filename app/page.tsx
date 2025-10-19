@@ -52,19 +52,7 @@ export default function Home() {
     setAuthView('confirm')
   }
 
-  // Function to handle file upload data
-  const make_file = (jsonData: any) => {
-    console.log('make_file called with:', jsonData)
-    // TODO: Implement actual file processing logic here
-    // This could include:
-    // - Saving to database
-    // - Uploading to cloud storage
-    // - Processing the file
-    // - Sending to API endpoint
-    return { success: true, message: 'File processed successfully' }
-  }
-
-  const handleUploadSubmit = (formData: any) => {
+  const handleUploadSubmit = async (formData: any) => {
     const jsonData = {
       "File path": formData.filePath,
       "Date Created": formData.date,
@@ -76,9 +64,29 @@ export default function Home() {
     
     console.log('Upload form data:', jsonData)
     
-    // Call the make_file function with the JSON data
-    const result = make_file(jsonData)
-    console.log('make_file result:', result)
+    try {
+      // Call the API endpoint to process the document
+      const response = await fetch('/api/process-document', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(jsonData)
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        console.log('Document processed successfully:', result)
+        alert('Document processed successfully!')
+      } else {
+        console.error('Error processing document:', result.error)
+        alert(`Error: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error calling process-document API:', error)
+      alert('Failed to process document. Please try again.')
+    }
     
     setShowUploadModal(false)
   }
@@ -835,8 +843,13 @@ export default function Home() {
             <form onSubmit={(e) => {
               e.preventDefault()
               const formData = new FormData(e.target as HTMLFormElement)
+              const fileInput = formData.get('filePath') as File
+              
+              // Get the file path from the selected file
+              const filePath = fileInput ? fileInput.name : ''
+              
               const data = {
-                filePath: formData.get('filePath') as string,
+                filePath: filePath,
                 date: formData.get('date') as string,
                 studyGroupName: formData.get('studyGroupName') as string,
                 className: formData.get('className') as string,
@@ -847,15 +860,16 @@ export default function Home() {
             }} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Path to file:
+                  Select File:
                 </label>
                 <input
-                  type="text"
+                  type="file"
                   name="filePath"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter file path"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  accept=".pdf,.doc,.docx,.txt,.md,.ppt,.pptx,.xls,.xlsx"
                 />
+                <p className="text-xs text-gray-500 mt-1">Supported formats: PDF, DOC, DOCX, TXT, MD, PPT, PPTX, XLS, XLSX</p>
               </div>
 
               <div>
