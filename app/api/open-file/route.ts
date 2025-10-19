@@ -42,7 +42,25 @@ export async function POST(request: NextRequest) {
       // Use specific application
       switch (platform) {
         case 'darwin': // macOS
-          command = `open -a "${application}" "${expandedPath}"`
+          // Handle different applications with specific commands
+          if (application.toLowerCase().includes('chrome')) {
+            command = `open -a "Google Chrome" "${expandedPath}"`
+          } else if (application.toLowerCase().includes('safari')) {
+            command = `open -a "Safari" "${expandedPath}"`
+          } else if (application.toLowerCase().includes('firefox')) {
+            command = `open -a "Firefox" "${expandedPath}"`
+          } else if (application.toLowerCase().includes('preview')) {
+            command = `open -a "Preview" "${expandedPath}"`
+          } else if (application.toLowerCase().includes('adobe') || application.toLowerCase().includes('acrobat')) {
+            command = `open -a "Adobe Acrobat" "${expandedPath}"`
+          } else if (application.toLowerCase().includes('textedit')) {
+            command = `open -a "TextEdit" "${expandedPath}"`
+          } else if (application.toLowerCase().includes('vscode') || application.toLowerCase().includes('code')) {
+            command = `open -a "Visual Studio Code" "${expandedPath}"`
+          } else {
+            // Fallback to generic open command
+            command = `open -a "${application}" "${expandedPath}"`
+          }
           break
         case 'win32': // Windows
           command = `"${application}" "${expandedPath}"`
@@ -90,10 +108,50 @@ export async function POST(request: NextRequest) {
       })
     } catch (execError: any) {
       console.error('Error executing open command:', execError)
+      
+      // For browsers, try alternative approach with file:// URL
+      if (application && (application.toLowerCase().includes('chrome') || 
+                         application.toLowerCase().includes('safari') || 
+                         application.toLowerCase().includes('firefox'))) {
+        try {
+          const fileUrl = `file://${expandedPath}`
+          let browserCommand: string
+          
+          if (application.toLowerCase().includes('chrome')) {
+            browserCommand = `open -a "Google Chrome" "${fileUrl}"`
+          } else if (application.toLowerCase().includes('safari')) {
+            browserCommand = `open -a "Safari" "${fileUrl}"`
+          } else if (application.toLowerCase().includes('firefox')) {
+            browserCommand = `open -a "Firefox" "${fileUrl}"`
+          } else {
+            throw new Error('Unknown browser')
+          }
+          
+          await execAsync(browserCommand)
+          
+          return NextResponse.json({
+            success: true,
+            message: `File opened with ${application} (using file:// URL)`,
+            platform: platform,
+            command: browserCommand,
+            expandedPath: expandedPath,
+            application: application
+          })
+        } catch (browserError: any) {
+          console.error('Error with browser file:// URL approach:', browserError)
+        }
+      }
+      
       return NextResponse.json({ 
         success: false, 
         error: `Failed to open file: ${execError.message}`,
-        expandedPath: expandedPath
+        command: command,
+        expandedPath: expandedPath,
+        suggestion: application && (application.toLowerCase().includes('chrome') || 
+                                   application.toLowerCase().includes('safari') || 
+                                   application.toLowerCase().includes('firefox')) 
+          ? 'Try using Preview or Adobe Acrobat for PDF files, or check if the browser is installed correctly.'
+          : 'Try using a different application or check if the application is installed correctly.'
       }, { status: 500 })
     }
 

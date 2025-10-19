@@ -38,7 +38,7 @@ export default function OpenFileModal({
     const commonApps = [
       { name: 'default', label: 'Default Application', icon: '📄' },
       { name: 'Preview', label: 'Preview (macOS)', icon: '👁️' },
-      { name: 'Adobe Acrobat Reader DC', label: 'Adobe Acrobat', icon: '📕' },
+      { name: 'Adobe Acrobat', label: 'Adobe Acrobat', icon: '📕' },
       { name: 'TextEdit', label: 'TextEdit', icon: '📝' },
       { name: 'Safari', label: 'Safari', icon: '🌐' },
       { name: 'Chrome', label: 'Google Chrome', icon: '🌐' },
@@ -54,7 +54,7 @@ export default function OpenFileModal({
     switch (extension) {
       case 'pdf':
         return commonApps.filter(app => 
-          ['default', 'Preview', 'Adobe Acrobat Reader DC', 'Safari', 'Chrome', 'Firefox'].includes(app.name)
+          ['default', 'Preview', 'Adobe Acrobat', 'Safari', 'Chrome', 'Firefox'].includes(app.name)
         )
       case 'txt':
       case 'md':
@@ -101,6 +101,16 @@ export default function OpenFileModal({
           <p className="text-xs text-gray-500 mb-4">
             File location: {filePath}
           </p>
+          
+          {/* File type specific guidance */}
+          {fileName.toLowerCase().endsWith('.pdf') && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>💡 Tip:</strong> For PDF files, Preview and Adobe Acrobat work best. 
+                Browsers may show a blank page or require additional setup.
+              </p>
+            </div>
+          )}
         </div>
         
         <form onSubmit={handleSubmit}>
