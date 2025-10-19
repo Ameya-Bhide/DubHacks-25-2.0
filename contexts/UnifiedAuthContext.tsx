@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { hasRealAWSConfig } from '@/lib/aws-config'
 import { loadAWSModules } from '@/lib/aws-loader'
+import { createUserProfile } from '@/lib/aws-user-profiles'
 
 interface User {
   username: string
@@ -19,7 +20,7 @@ interface AuthContextType {
   isAWSMode: boolean
   retryAWS: () => void
   signIn: (email: string, password: string) => Promise<any>
-  signUp: (email: string, password: string, givenName: string, familyName: string) => Promise<any>
+  signUp: (email: string, password: string, givenName: string, familyName: string, university: string, className: string) => Promise<any>
   signOut: () => Promise<void>
   confirmSignUp: (email: string, code: string) => Promise<any>
   resendSignUp: (email: string) => Promise<any>
@@ -133,8 +134,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           return result
         },
-        signUp: async (email: string, password: string, givenName: string, familyName: string) => {
-          return await awsSignUp({
+        signUp: async (email: string, password: string, givenName: string, familyName: string, university: string, className: string) => {
+          // First, create the Cognito user
+          const cognitoResult = await awsSignUp({
             username: email,
             password,
             options: { 
@@ -142,9 +144,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 email,
                 given_name: givenName,
                 family_name: familyName
+                // Note: We're not storing university/className in Cognito anymore
+                // They'll be stored in DynamoDB user profile instead
               } 
             }
           })
+
+          // If signup was successful, create user profile in DynamoDB
+          if (cognitoResult && !cognitoResult.isSignUpComplete) {
+            try {
+              await createUserProfile({
+                userId: email, // Use email as user ID
+                email,
+                givenName,
+                familyName,
+                university,
+                className
+              })
+              console.log('✅ User profile created in DynamoDB')
+            } catch (profileError) {
+              console.error('❌ Failed to create user profile:', profileError)
+              // Don't fail the signup if profile creation fails
+              // The user can still complete signup and we can retry profile creation later
+            }
+          }
+
+          return cognitoResult
         },
         signOut: async () => {
           await awsSignOut()
@@ -221,7 +246,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           throw new Error('Invalid credentials')
         },
-        signUp: async (email: string, password: string, givenName: string, familyName: string) => {
+        signUp: async (email: string, password: string, givenName: string, familyName: string, university: string, className: string) => {
+          // Create user profile in DynamoDB (dev mode uses localStorage)
+          try {
+            await createUserProfile({
+              userId: email,
+              email,
+              givenName,
+              familyName,
+              university,
+              className
+            })
+            console.log('✅ User profile created (dev mode)')
+          } catch (profileError) {
+            console.error('❌ Failed to create user profile:', profileError)
+          }
+          
           return {
             isSignUpComplete: false,
             nextStep: {

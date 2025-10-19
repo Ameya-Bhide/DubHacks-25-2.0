@@ -1,17 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface CreateGroupModalProps {
   isOpen: boolean
   onClose: () => void
   onCreateGroup: (groupData: any) => void
+  userProfile?: {
+    university?: string
+    className?: string
+  }
 }
 
-export default function CreateGroupModal({ isOpen, onClose, onCreateGroup }: CreateGroupModalProps) {
+export default function CreateGroupModal({ isOpen, onClose, onCreateGroup, userProfile }: CreateGroupModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    university: '',
+    className: '',
     subject: '',
     maxMembers: 20, // Fixed cap of 20 members
     meetingFrequency: 'weekly',
@@ -20,6 +26,40 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup }: Cre
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Pre-populate form with user profile data when modal opens
+  useEffect(() => {
+    if (isOpen && userProfile) {
+      setFormData(prev => ({
+        ...prev,
+        university: userProfile.university || '',
+        className: userProfile.className || ''
+      }))
+    }
+  }, [isOpen, userProfile])
+
+  const universities = [
+    'University of Washington',
+    'University of California, Berkeley',
+    'Stanford University',
+    'University of California, Los Angeles',
+    'University of California, San Diego',
+    'University of Southern California',
+    'California Institute of Technology',
+    'University of California, Davis',
+    'University of California, Irvine',
+    'University of California, Santa Barbara',
+    'University of California, Santa Cruz',
+    'University of California, Riverside',
+    'University of California, Merced',
+    'University of Oregon',
+    'Oregon State University',
+    'Portland State University',
+    'University of British Columbia',
+    'Simon Fraser University',
+    'University of Victoria',
+    'Other'
+  ]
 
   const subjects = [
     'Computer Science',
@@ -75,6 +115,8 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup }: Cre
       setFormData({
         name: '',
         description: '',
+        university: '',
+        className: '',
         subject: '',
         maxMembers: 20, // Fixed cap of 20 members
         meetingFrequency: 'weekly',
@@ -158,6 +200,44 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup }: Cre
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Describe what your study group will focus on..."
               />
+            </div>
+
+            {/* University and Class */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="university" className="block text-sm font-medium text-gray-700 mb-2">
+                  University *
+                </label>
+                <select
+                  id="university"
+                  name="university"
+                  required
+                  value={formData.university}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select university</option>
+                  {universities.map(university => (
+                    <option key={university} value={university}>{university}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="className" className="block text-sm font-medium text-gray-700 mb-2">
+                  Class Name/Code *
+                </label>
+                <input
+                  type="text"
+                  id="className"
+                  name="className"
+                  required
+                  value={formData.className}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., CSE 142, MATH 124"
+                />
+              </div>
             </div>
 
             {/* Subject */}

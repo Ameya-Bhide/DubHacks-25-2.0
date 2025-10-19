@@ -10,6 +10,7 @@ import CreateGroupModal from '@/components/CreateGroupModal'
 import InviteCard from '@/components/InviteCard'
 import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup } from '@/lib/aws-study-groups'
 import { hasRealAWSConfig } from '@/lib/aws-config'
+import { getUserProfile, UserProfile } from '@/lib/aws-user-profiles'
 
 type AuthView = 'login' | 'signup' | 'confirm' | 'forgot'
 
@@ -27,6 +28,7 @@ export default function Home() {
   const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([])
   const [invites, setInvites] = useState<any[]>([])
   const [showInvites, setShowInvites] = useState(false)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const { user, loading, signOut, isAWSMode, retryAWS } = useAuth()
 
   // Handle URL tab parameter
@@ -138,11 +140,12 @@ export default function Home() {
     return !(year === 2026 && month === 11) // Can't go after December 2026
   }
 
-  // Load study groups and invites when user is authenticated
+  // Load study groups, invites, and user profile when user is authenticated
   useEffect(() => {
     if (user) {
       loadStudyGroups()
       loadInvites()
+      loadUserProfile()
     }
   }, [user])
 
@@ -190,6 +193,18 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error loading invites:', error)
+    }
+  }
+
+  const loadUserProfile = async () => {
+    if (!user) return
+
+    try {
+      const profile = await getUserProfile(user.username)
+      setUserProfile(profile)
+      console.log('📋 User profile loaded:', profile)
+    } catch (error) {
+      console.error('Error loading user profile:', error)
     }
   }
 
@@ -982,6 +997,10 @@ export default function Home() {
         isOpen={isCreateGroupOpen}
         onClose={() => setIsCreateGroupOpen(false)}
         onCreateGroup={handleCreateGroup}
+        userProfile={userProfile ? {
+          university: userProfile.university,
+          className: userProfile.className
+        } : undefined}
       />
     </div>
   )

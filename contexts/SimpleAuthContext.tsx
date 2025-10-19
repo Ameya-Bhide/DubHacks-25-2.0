@@ -15,7 +15,7 @@ interface AuthContextType {
   user: User | null
   loading: boolean
   signIn: (username: string, password: string) => Promise<any>
-  signUp: (username: string, password: string, email: string) => Promise<any>
+  signUp: (username: string, password: string, email: string, university: string) => Promise<any>
   signOut: () => Promise<void>
   confirmSignUp: (username: string, code: string) => Promise<any>
   resendSignUp: (username: string) => Promise<any>
@@ -90,8 +90,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const handleSignUp = async (username: string, password: string, email: string) => {
+  const handleSignUp = async (username: string, password: string, email: string, university: string) => {
     try {
+      // Store university in localStorage for dev mode
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dev-user-university', university)
+      }
+      
       // Simple dev signup - always succeeds
       return {
         isSignUpComplete: false,

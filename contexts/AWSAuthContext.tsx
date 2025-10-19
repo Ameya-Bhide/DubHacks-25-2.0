@@ -17,7 +17,7 @@ interface AuthContextType {
   user: User | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<any>
-  signUp: (email: string, password: string, givenName: string, familyName: string) => Promise<any>
+  signUp: (email: string, password: string, givenName: string, familyName: string, university: string) => Promise<any>
   signOut: () => Promise<void>
   confirmSignUp: (email: string, code: string) => Promise<any>
   resendSignUp: (email: string) => Promise<any>
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const handleSignUp = async (email: string, password: string, givenName: string, familyName: string) => {
+  const handleSignUp = async (email: string, password: string, givenName: string, familyName: string, university: string) => {
     try {
       const result = await signUp({
         username: email, // Use email as username
@@ -124,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email,
             given_name: givenName,
             family_name: familyName,
+            'custom:university': university,
           },
         },
       })
