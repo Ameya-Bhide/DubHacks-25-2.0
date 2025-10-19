@@ -375,14 +375,22 @@ export default function Home() {
 
   const loadUpcomingMeetings = async (groups?: StudyGroup[]) => {
     const groupsToUse = groups || studyGroups
-    if (!user || groupsToUse.length === 0) return
+    console.log('🔍 Loading upcoming meetings...', { user: !!user, groupsCount: groupsToUse.length })
+    
+    if (!user || groupsToUse.length === 0) {
+      console.log('❌ No user or groups, skipping upcoming meetings load')
+      return
+    }
 
     try {
       const allMeetings: MeetingWithGroupName[] = []
       
       // Get meetings from all study groups
       for (const group of groupsToUse) {
+        console.log(`📅 Getting meetings for group: ${group.name} (${group.id})`)
         const meetings = await devMeetings.getMeetingsForGroup(group.id)
+        console.log(`📅 Found ${meetings.length} meetings for group ${group.name}`)
+        
         // Add group name to each meeting
         const meetingsWithGroupName = meetings.map(meeting => ({
           ...meeting,
@@ -391,12 +399,18 @@ export default function Home() {
         allMeetings.push(...meetingsWithGroupName)
       }
       
+      console.log(`📅 Total meetings found: ${allMeetings.length}`)
+      
       // Filter for upcoming meetings and sort by date
       const now = new Date()
+      console.log('🕐 Current time:', now.toISOString())
+      
       const upcoming = allMeetings
         .filter(meeting => {
           const meetingDate = new Date(`${meeting.date}T${meeting.time}`)
-          return meetingDate > now
+          const isUpcoming = meetingDate > now
+          console.log(`📅 Meeting "${meeting.title}" on ${meeting.date} at ${meeting.time} - ${isUpcoming ? 'UPCOMING' : 'PAST'}`)
+          return isUpcoming
         })
         .sort((a, b) => {
           const dateA = new Date(`${a.date}T${a.time}`)
@@ -405,6 +419,7 @@ export default function Home() {
         })
         .slice(0, 3) // Get only the 3 closest
       
+      console.log(`📅 Upcoming meetings to display: ${upcoming.length}`)
       setUpcomingMeetings(upcoming)
     } catch (error) {
       console.error('Error loading upcoming meetings:', error)
@@ -505,7 +520,7 @@ export default function Home() {
       
       // Reload study groups to show the new membership if accepted
       if (response === 'accept') {
-        loadStudyGroups()
+          loadStudyGroups()
       }
       
       alert(`Invite ${response}ed successfully!`)
@@ -622,16 +637,16 @@ export default function Home() {
         const result = await leaveStudyGroup(group.id, user.username)
         
         if (result.deleted) {
-          alert('You have left the group and it has been deleted.')
-        } else {
-          alert('You have successfully left the group.')
-        }
-        
-        // Reload study groups
-        loadStudyGroups()
-        // Close the modal
-        setIsGroupDetailsOpen(false)
-        setSelectedGroupForDetails(null)
+              alert('You have left the group and it has been deleted.')
+            } else {
+              alert('You have successfully left the group.')
+            }
+            
+            // Reload study groups
+            loadStudyGroups()
+            // Close the modal
+            setIsGroupDetailsOpen(false)
+            setSelectedGroupForDetails(null)
       } catch (error) {
         console.error('Error leaving study group:', error)
         alert('Failed to leave study group')
@@ -721,7 +736,7 @@ export default function Home() {
         // Reload both user groups and public groups
         loadStudyGroups()
         loadPublicGroups()
-      } catch (error) {
+    } catch (error) {
         console.error('Error joining group:', error)
         alert('Failed to join group. Please try again.')
       }
@@ -1047,21 +1062,21 @@ export default function Home() {
                 </div>
                 
                 {studyGroups.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                      <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Study Groups Yet</h3>
-                    <p className="text-gray-600 mb-6">Start your learning journey by creating or joining a study group.</p>
+                <div className="text-center py-12">
+                  <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Study Groups Yet</h3>
+                  <p className="text-gray-600 mb-6">Start your learning journey by creating or joining a study group.</p>
                     <button 
                       onClick={() => setIsCreateGroupOpen(true)}
                       className="bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition duration-200"
                     >
                       Create Your First Group
                     </button>
-                  </div>
+                </div>
                 ) : (
                   <div className="space-y-4">
                     {studyGroups.slice(0, 3).map(group => (
@@ -1128,7 +1143,7 @@ export default function Home() {
                           className="text-blue-600 hover:text-blue-700 font-medium text-sm"
                         >
                           View All {studyGroups.length} Groups →
-                        </button>
+                </button>
                       </div>
                     )}
                   </div>
@@ -1141,15 +1156,16 @@ export default function Home() {
               {/* Upcoming Dates */}
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Dates</h3>
+                {console.log('🎯 Rendering upcoming meetings:', upcomingMeetings.length, upcomingMeetings)}
                 {upcomingMeetings.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <p className="text-gray-600 text-sm">No upcoming meetings</p>
+                <div className="text-center py-8">
+                  <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                   </div>
+                    <p className="text-gray-600 text-sm">No upcoming meetings</p>
+                </div>
                 ) : (
                   <div className="space-y-3">
                     {upcomingMeetings.map(meeting => (
@@ -1232,8 +1248,8 @@ export default function Home() {
                   <div className="mx-auto w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mb-4">
                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                  </div>
+                </svg>
+              </div>
                   <h3 className="text-xl font-semibold mb-2">Flashcards</h3>
                   <p className="text-blue-100 text-sm">Generate AI-powered flashcards from your study materials</p>
                 </div>
@@ -2108,7 +2124,7 @@ export default function Home() {
                           setIsGroupDetailsOpen(false)
                           setSelectedGroupForDetails(null)
                           if (selectedGroupForDetails) {
-                            handleScheduleMeeting(selectedGroupForDetails)
+                          handleScheduleMeeting(selectedGroupForDetails)
                           }
                         }}
                         className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
