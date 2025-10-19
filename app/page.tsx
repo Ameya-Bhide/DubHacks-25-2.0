@@ -10,6 +10,7 @@ import CreateGroupModal from '@/components/CreateGroupModal'
 import InviteCard from '@/components/InviteCard'
 import FileNotifications from '@/components/FileNotifications'
 import DocumentCard from '@/components/DocumentCard'
+import OpenFileModal from '@/components/OpenFileModal'
 import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup } from '@/lib/aws-study-groups'
 import { hasRealAWSConfig } from '@/lib/aws-config'
 import { getUserProfile, UserProfile } from '@/lib/aws-user-profiles'
@@ -62,21 +63,34 @@ export default function Home() {
     console.log('Selected file:', file)
     
     try {
-      // Create file record for .ai_helper system
-      const fileRecord = {
-        fileName: formData.fileName,
-        originalFileName: file.name,
-        filePath: `~/Documents/UploadedFiles/${file.name}`, // This will be expanded by the system
-        studyGroupName: formData.studyGroupName,
-        description: formData.description,
-        dateCreated: formData.date,
-        className: formData.className,
-        fileSize: file.size,
-        fileType: file.type,
-        uploadedBy: user?.username || 'unknown-user',
-        uploadedAt: new Date().toISOString(),
-        isPersonal: formData.studyGroupName === 'Personal'
+      // First, upload the file locally to get the actual file path
+      const localUploadFormData = new FormData()
+      localUploadFormData.append('file', file)
+      localUploadFormData.append('fileName', formData.fileName)
+      localUploadFormData.append('studyGroupName', formData.studyGroupName)
+      localUploadFormData.append('description', formData.description)
+      localUploadFormData.append('dateCreated', formData.date)
+      localUploadFormData.append('className', formData.className)
+      localUploadFormData.append('uploadedBy', user?.username || 'unknown-user')
+      
+      // The API will automatically check common locations and preserve existing file paths
+
+      // Upload file to local filesystem
+      const localUploadResponse = await fetch('/api/upload-local-file', {
+        method: 'POST',
+        body: localUploadFormData
+      })
+      
+      const localUploadResult = await localUploadResponse.json()
+      
+      if (!localUploadResult.success) {
+        console.error('Error uploading file locally:', localUploadResult.error)
+        alert(`Failed to upload file: ${localUploadResult.error}`)
+        return
       }
+
+      const fileRecord = localUploadResult.fileRecord
+      console.log('File uploaded locally with actual path:', fileRecord.filePath)
 
       // Save file record to .ai_helper system (for local storage)
       const saveResponse = await fetch('/api/ai-helper-files', {
@@ -323,44 +337,53 @@ export default function Home() {
     }
   }
 
-  const handleDocumentOpen = async (filePath: string, fileName: string) => {
+  const [showOpenModal, setShowOpenModal] = useState(false)
+  const [pendingOpen, setPendingOpen] = useState<{
+    filePath: string
+    fileName: string
+  } | null>(null)
+
+  const handleDocumentOpen = (filePath: string, fileName: string) => {
+    // Set up the pending open and show the modal
+    setPendingOpen({ filePath, fileName })
+    setShowOpenModal(true)
+  }
+
+  const handleOpenConfirm = async (application: string) => {
+    if (!pendingOpen) return
+
+    const { filePath, fileName } = pendingOpen
+
     try {
-      // Expand the file path (replace ~ with actual home directory)
-      const expandedPath = filePath.replace('~', process.env.HOME || process.env.USERPROFILE || '~')
+      // Try to open the file using the selected application
+      const response = await fetch('/api/open-file', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filePath: filePath,
+          application: application
+        })
+      })
       
-      // For downloaded files, try to open them using the system's default application
-      if (filePath.includes('DownloadedFiles') || filePath.includes('UploadedFiles')) {
-        // Try to open the file using a system command
-        try {
-          const response = await fetch('/api/open-file', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              filePath: expandedPath
-            })
-          })
-          
-          const result = await response.json()
-          
-          if (result.success) {
-            alert(`✅ Opening file: ${fileName}\n\nFile location: ${expandedPath}`)
-          } else {
-            // Fallback: show the path and instructions
-            alert(`📁 File: ${fileName}\n\nFile location: ${expandedPath}\n\nYou can open this file by:\n1. Opening your file explorer\n2. Navigating to the path above\n3. Double-clicking the file`)
-          }
-        } catch (error) {
-          // Fallback: show the path and instructions
-          alert(`📁 File: ${fileName}\n\nFile location: ${expandedPath}\n\nYou can open this file by:\n1. Opening your file explorer\n2. Navigating to the path above\n3. Double-clicking the file`)
-        }
+      const result = await response.json()
+      
+      if (result.success) {
+        // Show a brief success message
+        const appName = application === 'default' ? 'default application' : application
+        alert(`✅ Opening "${fileName}" with ${appName}`)
       } else {
-        // For other files, just show the path
-        alert(`File location: ${expandedPath}\n\nYou can open it directly from your file system.`)
+        // Show error message with file path
+        alert(`❌ Failed to open file: ${result.error}\n\nFile location: ${filePath}\n\nYou can try:\n1. Opening your file explorer\n2. Navigating to the path above\n3. Double-clicking the file`)
       }
     } catch (error) {
       console.error('Error opening document:', error)
-      alert('Failed to open document. Please try again.')
+      // Fallback: show the path and instructions
+      alert(`❌ Error opening file\n\nFile location: ${filePath}\n\nYou can try:\n1. Opening your file explorer\n2. Navigating to the path above\n3. Double-clicking the file`)
+    } finally {
+      setShowOpenModal(false)
+      setPendingOpen(null)
     }
   }
 
@@ -1268,6 +1291,18 @@ export default function Home() {
         isOpen={showFileNotifications}
         onClose={() => setShowFileNotifications(false)}
         onFileDownloaded={loadDocuments}
+      />
+
+      {/* Open File Modal */}
+      <OpenFileModal
+        isOpen={showOpenModal}
+        fileName={pendingOpen?.fileName || ''}
+        filePath={pendingOpen?.filePath || ''}
+        onClose={() => {
+          setShowOpenModal(false)
+          setPendingOpen(null)
+        }}
+        onOpen={handleOpenConfirm}
       />
     </div>
   )
