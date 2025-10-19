@@ -29,31 +29,46 @@ const initializeDynamoDB = async () => {
 
 const TABLE_NAME = 'StudyGroups'
 
+export interface Meeting {
+  id: string
+  title: string
+  description: string
+  date: string
+  time: string
+  duration: number
+  location: string
+  meetingType: 'in-person' | 'online'
+  groupId: string
+  groupName: string
+  createdBy: string
+  createdAt: string
+  attendees: string[]
+}
+
 export interface StudyGroup {
   id: string
   name: string
   description: string
   subject: string
+  university: string
+  className: string
   maxMembers: number
   memberCount: number
   members: string[]
   createdBy: string
   createdAt: string
-  meetingFrequency: string
-  meetingDay: string
-  meetingTime: string
   isActive: boolean
   isPublic: boolean
+  meetings?: Meeting[]
 }
 
 export interface CreateGroupData {
   name: string
   description: string
   subject: string
+  university: string
+  className: string
   maxMembers: number
-  meetingFrequency: string
-  meetingDay: string
-  meetingTime: string
   isPublic: boolean
 }
 
@@ -335,5 +350,45 @@ export const devStudyGroups = {
     localStorage.setItem('dev-study-groups', JSON.stringify(allGroups))
     
     return group
+  }
+}
+
+// Meeting storage functions for dev mode
+export const devMeetings = {
+  saveMeeting: async (meeting: Meeting): Promise<Meeting> => {
+    if (typeof window === 'undefined') throw new Error('Not in browser environment')
+    
+    // Get existing meetings
+    const existingMeetings = JSON.parse(localStorage.getItem('dev-meetings') || '[]')
+    
+    // Add new meeting
+    existingMeetings.push(meeting)
+    
+    // Save back to localStorage
+    localStorage.setItem('dev-meetings', JSON.stringify(existingMeetings))
+    
+    return meeting
+  },
+
+  getMeetingsForGroup: async (groupId: string): Promise<Meeting[]> => {
+    if (typeof window === 'undefined') throw new Error('Not in browser environment')
+    
+    const allMeetings = JSON.parse(localStorage.getItem('dev-meetings') || '[]')
+    return allMeetings.filter((meeting: Meeting) => meeting.groupId === groupId)
+  },
+
+  getAllMeetings: async (): Promise<Meeting[]> => {
+    if (typeof window === 'undefined') throw new Error('Not in browser environment')
+    
+    return JSON.parse(localStorage.getItem('dev-meetings') || '[]')
+  },
+
+  deleteMeeting: async (meetingId: string): Promise<void> => {
+    if (typeof window === 'undefined') throw new Error('Not in browser environment')
+    
+    const allMeetings = JSON.parse(localStorage.getItem('dev-meetings') || '[]')
+    const filteredMeetings = allMeetings.filter((meeting: Meeting) => meeting.id !== meetingId)
+    
+    localStorage.setItem('dev-meetings', JSON.stringify(filteredMeetings))
   }
 }

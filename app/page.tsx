@@ -7,11 +7,12 @@ import LoginForm from '@/components/LoginForm'
 import SignUpForm from '@/components/SignUpForm'
 import ConfirmSignUpForm from '@/components/ConfirmSignUpForm'
 import CreateGroupModal from '@/components/CreateGroupModal'
+import MeetingScheduler from '@/components/MeetingScheduler'
 import InviteCard from '@/components/InviteCard'
 import FileNotifications from '@/components/FileNotifications'
 import DocumentCard from '@/components/DocumentCard'
 import OpenFileModal from '@/components/OpenFileModal'
-import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup } from '@/lib/aws-study-groups'
+import { createStudyGroup, getUserStudyGroups, devStudyGroups, StudyGroup, leaveStudyGroup, devMeetings, Meeting } from '@/lib/aws-study-groups'
 import { hasRealAWSConfig } from '@/lib/aws-config'
 import { getUserProfile, UserProfile } from '@/lib/aws-user-profiles'
 
@@ -28,6 +29,11 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
+  const [isMeetingSchedulerOpen, setIsMeetingSchedulerOpen] = useState(false)
+  const [selectedGroupForMeeting, setSelectedGroupForMeeting] = useState<StudyGroup | null>(null)
+  const [selectedGroupForDetails, setSelectedGroupForDetails] = useState<StudyGroup | null>(null)
+  const [isGroupDetailsOpen, setIsGroupDetailsOpen] = useState(false)
+  const [groupMeetings, setGroupMeetings] = useState<Meeting[]>([])
   const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([])
   const [invites, setInvites] = useState<any[]>([])
   const [showInvites, setShowInvites] = useState(false)
@@ -474,6 +480,117 @@ export default function Home() {
     }
   }
 
+  const handleScheduleMeeting = (group: StudyGroup) => {
+    setSelectedGroupForMeeting(group)
+    setIsMeetingSchedulerOpen(true)
+  }
+
+  const handleMeetingSubmit = async (meetingData: any) => {
+    try {
+      console.log('Scheduling meeting:', meetingData)
+      
+      // Refresh meetings list for the current group
+      if (selectedGroupForDetails) {
+        const meetings = await devMeetings.getMeetingsForGroup(selectedGroupForDetails.id)
+        setGroupMeetings(meetings)
+      }
+      
+      alert(`Meeting "${meetingData.title}" scheduled for ${meetingData.date} at ${meetingData.time}`)
+    } catch (error) {
+      console.error('Error scheduling meeting:', error)
+    }
+  }
+
+  const handleStudyGroupClick = async (group: StudyGroup) => {
+    setSelectedGroupForDetails(group)
+    setIsGroupDetailsOpen(true)
+    
+    // Load meetings for this group
+    try {
+      const meetings = await devMeetings.getMeetingsForGroup(group.id)
+      setGroupMeetings(meetings)
+    } catch (error) {
+      console.error('Error loading meetings:', error)
+      setGroupMeetings([])
+    }
+  }
+
+  const handleLeaveGroup = async (group: StudyGroup) => {
+    if (!user) return
+
+    const confirmMessage = group.memberCount === 1 
+      ? `Are you sure you want to leave "${group.name}"? This will delete the group since you are the last member.`
+      : `Are you sure you want to leave "${group.name}"?`
+
+    if (confirm(confirmMessage)) {
+      try {
+        // Update localStorage (dev mode)
+        const storedGroups = localStorage.getItem('dev-study-groups')
+        if (storedGroups) {
+          const groups = JSON.parse(storedGroups)
+          const groupIndex = groups.findIndex((g: StudyGroup) => g.id === group.id)
+          
+          if (groupIndex !== -1) {
+            if (group.memberCount === 1) {
+              // Delete the group if it's the last member
+              groups.splice(groupIndex, 1)
+              alert('You have left the group and it has been deleted.')
+            } else {
+              // Remove user from members list
+              groups[groupIndex].members = groups[groupIndex].members.filter((member: string) => member !== user.username)
+              groups[groupIndex].memberCount = groups[groupIndex].members.length
+              alert('You have successfully left the group.')
+            }
+            
+            localStorage.setItem('dev-study-groups', JSON.stringify(groups))
+            // Reload study groups
+            loadStudyGroups()
+            // Close the modal
+            setIsGroupDetailsOpen(false)
+            setSelectedGroupForDetails(null)
+          }
+        }
+      } catch (error) {
+        console.error('Error leaving study group:', error)
+        alert('Failed to leave study group')
+      }
+    }
+  }
+
+  const handleTogglePublic = async (group: StudyGroup) => {
+    if (!user || group.createdBy !== user.username) {
+      alert('Only the group creator can change the public setting.')
+      return
+    }
+
+    try {
+      // Update localStorage (dev mode)
+      const storedGroups = localStorage.getItem('dev-study-groups')
+      if (storedGroups) {
+        const groups = JSON.parse(storedGroups)
+        const groupIndex = groups.findIndex((g: StudyGroup) => g.id === group.id)
+        
+        if (groupIndex !== -1) {
+          // Toggle the public setting
+          groups[groupIndex].isPublic = !groups[groupIndex].isPublic
+          
+          localStorage.setItem('dev-study-groups', JSON.stringify(groups))
+          
+          // Update the selected group for details
+          setSelectedGroupForDetails(groups[groupIndex])
+          
+          // Reload study groups
+          loadStudyGroups()
+          
+          alert(`Group is now ${groups[groupIndex].isPublic ? 'public' : 'private'}.`)
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling public setting:', error)
+      alert('Failed to update group setting')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -837,7 +954,7 @@ export default function Home() {
                   {studyGroups.map(group => (
                     <div 
                       key={group.id} 
-                      onClick={() => router.push(`/study-group/${group.id}`)}
+                      onClick={() => handleStudyGroupClick(group)}
                       className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                     >
                       <div className="flex items-start justify-between">
@@ -853,9 +970,9 @@ export default function Home() {
                             </span>
                             <span className="flex items-center">
                               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                               </svg>
-                              {group.meetingFrequency} • {group.meetingDay} at {group.meetingTime}
+                              {group.university}
                             </span>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               group.subject === 'Computer Science' ? 'bg-blue-100 text-blue-800' :
@@ -867,7 +984,19 @@ export default function Home() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleScheduleMeeting(group)
+                            }}
+                            className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Schedule Meeting
+                          </button>
                           <div className="flex -space-x-2">
                             {group.members.slice(0, 3).map((member, index) => (
                               <div
@@ -900,6 +1029,27 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
             </button>
+
+            {/* Clear Dev Data Button (only show in dev mode) */}
+            {!hasRealAWSConfig() && studyGroups.length > 0 && (
+              <button 
+                onClick={() => {
+                  if (confirm('Clear all development data? This will remove all study groups and reset the app.')) {
+                    localStorage.removeItem('dev-study-groups')
+                    localStorage.removeItem('dev-user-profiles')
+                    localStorage.removeItem('dev-invites')
+                    setStudyGroups([])
+                    alert('Development data cleared! You can now create fresh study groups.')
+                  }
+                }}
+                className="fixed bottom-6 right-24 w-14 h-14 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50"
+                title="Clear Development Data"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
           </div>
         )}
 
@@ -1285,6 +1435,20 @@ export default function Home() {
         } : undefined}
       />
 
+      {/* Meeting Scheduler Modal */}
+      {selectedGroupForMeeting && (
+        <MeetingScheduler
+          isOpen={isMeetingSchedulerOpen}
+          onClose={() => {
+            setIsMeetingSchedulerOpen(false)
+            setSelectedGroupForMeeting(null)
+          }}
+          onScheduleMeeting={handleMeetingSubmit}
+          groupId={selectedGroupForMeeting.id}
+          groupName={selectedGroupForMeeting.name}
+        />
+      )}
+
       {/* File Notifications Modal */}
       <FileNotifications
         userId={user?.username || ''}
@@ -1304,6 +1468,217 @@ export default function Home() {
         }}
         onOpen={handleOpenConfirm}
       />
+
+      {/* Study Group Details Modal */}
+      {selectedGroupForDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-900">{selectedGroupForDetails.name}</h2>
+              <button
+                onClick={() => {
+                  setIsGroupDetailsOpen(false)
+                  setSelectedGroupForDetails(null)
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Main Content */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Group Info */}
+                  <div className="bg-gray-50 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Group Information</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Description:</span>
+                        <p className="text-gray-900 mt-1">{selectedGroupForDetails.description}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Subject:</span>
+                        <p className="text-gray-900 mt-1">{selectedGroupForDetails.subject}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">University:</span>
+                        <p className="text-gray-900 mt-1">{selectedGroupForDetails.university}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Class:</span>
+                        <p className="text-gray-900 mt-1">{selectedGroupForDetails.className}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Created:</span>
+                        <p className="text-gray-900 mt-1">{new Date(selectedGroupForDetails.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Scheduled Meetings */}
+                  <div className="bg-gray-50 rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Scheduled Meetings</h3>
+                      <button 
+                        onClick={() => {
+                          setIsGroupDetailsOpen(false)
+                          setSelectedGroupForDetails(null)
+                          handleScheduleMeeting(selectedGroupForDetails)
+                        }}
+                        className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                      >
+                        + Schedule Meeting
+                      </button>
+                    </div>
+                    {groupMeetings.length === 0 ? (
+                      <div className="text-center py-8">
+                        <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <p className="text-gray-600 text-sm">No meetings scheduled yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {groupMeetings.map((meeting) => (
+                          <div key={meeting.id} className="bg-white rounded-lg p-4 border border-gray-200">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-900 mb-1">{meeting.title}</h4>
+                                {meeting.description && (
+                                  <p className="text-gray-600 text-sm mb-2">{meeting.description}</p>
+                                )}
+                                <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                  <span className="flex items-center">
+                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    {new Date(meeting.date).toLocaleDateString()} at {meeting.time}
+                                  </span>
+                                  <span className="flex items-center">
+                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {meeting.duration} min
+                                  </span>
+                                  <span className="flex items-center">
+                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    {meeting.meetingType === 'in-person' ? 'In-Person' : 'Online'}
+                                  </span>
+                                </div>
+                                <p className="text-gray-600 text-sm mt-2">{meeting.location}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sidebar */}
+                <div className="space-y-6">
+                  {/* Members */}
+                  <div className="bg-gray-50 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Members ({selectedGroupForDetails.memberCount}/{selectedGroupForDetails.maxMembers})</h3>
+                    <div className="space-y-3">
+                      {selectedGroupForDetails.members.map((member, index) => (
+                        <div key={index} className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-medium text-blue-600">
+                              {member.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="text-sm text-gray-900">{member}</span>
+                          {member === selectedGroupForDetails.createdBy && (
+                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                              Creator
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Group Settings */}
+                  <div className="bg-gray-50 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Group Settings</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Public Group</span>
+                        {user && selectedGroupForDetails.createdBy === user.username ? (
+                          <button
+                            onClick={() => handleTogglePublic(selectedGroupForDetails)}
+                            className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                              selectedGroupForDetails.isPublic 
+                                ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                            }`}
+                          >
+                            {selectedGroupForDetails.isPublic ? 'Public' : 'Private'}
+                          </button>
+                        ) : (
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            selectedGroupForDetails.isPublic 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {selectedGroupForDetails.isPublic ? 'Public' : 'Private'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Status</span>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          selectedGroupForDetails.isActive 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {selectedGroupForDetails.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  {user && selectedGroupForDetails.members.includes(user.username) && (
+                    <div className="bg-gray-50 rounded-xl p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => {
+                            // Show group ID for sharing
+                            alert(`Share this group ID with others: ${selectedGroupForDetails.id}`)
+                          }}
+                          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Invite Members
+                        </button>
+                        <button
+                          onClick={() => handleLeaveGroup(selectedGroupForDetails)}
+                          className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                          Leave Group
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
