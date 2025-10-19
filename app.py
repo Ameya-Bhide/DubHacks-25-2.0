@@ -4,30 +4,44 @@ import boto3
 import yaml
 from botocore.exceptions import ClientError
 from flask import Flask, request, jsonify
+from dotenv import load_dotenv
+
+# --- Load environment variables from .env.local ---
+load_dotenv('.env.local')
 
 # --- Initialize Flask App ---
 app = Flask(__name__)
 
 # --- AWS Bedrock Configuration (Copied from your Lambda) ---
-REGION = os.environ.get("AWS_REGION", "us-east-1")
+REGION = os.environ.get("FLASK_AWS_DEFAULT_REGION", "us-east-1")
 MODEL_ID = os.environ.get("MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
 
-# AWS credentials should be set via environment variables
-# Use aws configure or set environment variables:
-# export AWS_ACCESS_KEY_ID=your_access_key
-# export AWS_SECRET_ACCESS_KEY=your_secret_key
-# export AWS_DEFAULT_REGION=us-east-1
+# AWS credentials from .env.local file
+# These are loaded automatically by python-dotenv from .env.local
+AWS_ACCESS_KEY_ID = os.environ.get("FLASK_AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("FLASK_AWS_SECRET_ACCESS_KEY")
+AWS_DEFAULT_REGION = os.environ.get("FLASK_AWS_DEFAULT_REGION", "us-east-1")
 
 print(f"Initializing Bedrock client in region: {REGION}...")
+print(f"Using AWS Access Key ID: {AWS_ACCESS_KEY_ID[:10]}..." if AWS_ACCESS_KEY_ID else "No AWS Access Key ID found")
 try:
-    bedrock = boto3.client("bedrock-runtime", region_name=REGION)
+    # Initialize Bedrock client with explicit credentials from .env.local
+    bedrock = boto3.client(
+        "bedrock-runtime", 
+        region_name=REGION,
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+    )
     # Test credentials by making a small, non-existent call (or list models)
     # This will fail fast if credentials aren't set up.
     # A better check might be bedrock.list_foundation_models()
-    print("Bedrock client initialized.")
+    print("Bedrock client initialized successfully with credentials from .env.local")
 except Exception as e:
     print(f"CRITICAL: Failed to initialize Bedrock client: {e}")
-    print("Please ensure your AWS credentials (e.g., ~/.aws/credentials) are set up correctly.")
+    print("Please ensure your Flask AWS credentials are set in .env.local file:")
+    print("- FLASK_AWS_ACCESS_KEY_ID")
+    print("- FLASK_AWS_SECRET_ACCESS_KEY") 
+    print("- FLASK_AWS_DEFAULT_REGION")
     # We'll let it fail later if Bedrock is called, but this is a good warning.
 
 
