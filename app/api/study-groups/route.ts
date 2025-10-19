@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
+import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, ScanCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { v4 as uuidv4 } from 'uuid'
 
-// Force dynamic rendering to prevent static generation issues
-export const dynamic = 'force-dynamic'
+const TABLE_NAME = 'StudyGroups'
+const INVITES_TABLE_NAME = 'StudyGroupInvites'
 
-// Initialize DynamoDB client on server side
+// Initialize DynamoDB client
 const client = new DynamoDBClient({
-  region: process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1',
+  region: process.env.AWS_REGION || 'us-east-1',
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
@@ -16,36 +16,37 @@ const client = new DynamoDBClient({
 })
 
 const docClient = DynamoDBDocumentClient.from(client)
-const TABLE_NAME = 'StudyGroups'
-const INVITES_TABLE_NAME = 'StudyGroupInvites'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { action, data } = body
+    const { action, data } = await request.json()
 
-    if (action === 'create') {
-      const { groupData, createdBy } = data
+    if (action === 'createGroup') {
+      const { name, description, className, subject, university, maxMembers, isPublic, createdBy } = data
       
-      const newGroup = {
-        id: uuidv4(),
-        ...groupData,
-        memberCount: 1,
-        members: [createdBy],
+      const group = {
+        id: Date.now().toString(),
+        name,
+        description,
+        className,
+        subject,
+        university,
+        maxMembers: maxMembers || 20,
+        isPublic: isPublic !== false,
         createdBy,
-        createdAt: new Date().toISOString(),
+        members: [createdBy],
+        memberCount: 1,
         isActive: true,
-        isPublic: groupData.isPublic || false
+        createdAt: new Date().toISOString()
       }
-
+      
       const command = new PutCommand({
         TableName: TABLE_NAME,
-        Item: newGroup,
-        ConditionExpression: 'attribute_not_exists(id)'
+        Item: group
       })
-
+      
       await docClient.send(command)
-      return NextResponse.json({ success: true, group: newGroup })
+      return NextResponse.json({ success: true, group })
     }
 
     if (action === 'getUserGroups') {
@@ -53,42 +54,32 @@ export async function POST(request: NextRequest) {
       
       const command = new ScanCommand({
         TableName: TABLE_NAME,
-        FilterExpression: 'contains(members, :userId)',
+        FilterExpression: 'contains(members, :userId) AND isActive = :active',
         ExpressionAttributeValues: {
-          ':userId': userId
+          ':userId': userId,
+          ':active': true
         }
       })
-
+      
       const result = await docClient.send(command)
       return NextResponse.json({ success: true, groups: result.Items || [] })
     }
 
-    if (action === 'getGroup') {
-      const { groupId, userId } = data
-      
-      const command = new GetCommand({
+    if (action === 'getAllGroups') {
+      const command = new ScanCommand({
         TableName: TABLE_NAME,
-        Key: { id: groupId }
+        FilterExpression: 'isActive = :active',
+        ExpressionAttributeValues: { ':active': true }
       })
-
+      
       const result = await docClient.send(command)
-      const group = result.Item
-
-      // Check if user is a member of the group
-      if (!group || !group.members || !group.members.includes(userId)) {
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Access denied: You are not a member of this study group' 
-        }, { status: 403 })
-      }
-
-      return NextResponse.json({ success: true, group })
+      return NextResponse.json({ success: true, groups: result.Items || [] })
     }
 
-    if (action === 'leaveGroup') {
+    if (action === 'joinGroup') {
       const { groupId, userId } = data
       
-      // First, get the current group to check member count
+      // Get the current group
       const getCommand = new GetCommand({
         TableName: TABLE_NAME,
         Key: { id: groupId }
@@ -97,52 +88,115 @@ export async function POST(request: NextRequest) {
       const getResult = await docClient.send(getCommand)
       const group = getResult.Item
       
-      if (!group || !group.members || !group.members.includes(userId)) {
+      if (!group) {
         return NextResponse.json({ 
           success: false, 
-          error: 'User is not a member of this group' 
-        }, { status: 403 })
+          error: 'Group not found' 
+        }, { status: 404 })
       }
       
-      // If this is the last member, delete the group
-      if (group.memberCount === 1) {
-        const deleteCommand = new DeleteCommand({
-          TableName: TABLE_NAME,
-          Key: { id: groupId }
-        })
-        
-        await docClient.send(deleteCommand)
+      if (group.memberCount >= group.maxMembers) {
         return NextResponse.json({ 
-          success: true, 
-          group: null, 
-          deleted: true,
-          message: 'Group deleted as last member left'
-        })
+          success: false, 
+          error: 'Group is full' 
+        }, { status: 400 })
       }
       
-      // Otherwise, remove the user from the group
-      // Create a new members list without the user
-      const updatedMembers = group.members.filter((member: string) => member !== userId)
+      if (group.members.includes(userId)) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'You are already a member of this group' 
+        }, { status: 400 })
+      }
+      
+      // Add user to members list and increment member count
+      const updatedMembers = [...group.members, userId]
       
       const updateCommand = new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { id: groupId },
-        UpdateExpression: 'SET members = :updatedMembers, memberCount = memberCount - :one',
-        ConditionExpression: 'contains(members, :userId)',
+        UpdateExpression: 'SET members = :members, memberCount = :memberCount',
         ExpressionAttributeValues: {
-          ':userId': userId,
-          ':updatedMembers': updatedMembers,
-          ':one': 1
+          ':members': updatedMembers,
+          ':memberCount': group.memberCount + 1
         },
         ReturnValues: 'ALL_NEW'
       })
-
+      
       const result = await docClient.send(updateCommand)
-      return NextResponse.json({ 
-        success: true, 
-        group: result.Attributes,
-        deleted: false
+      const updatedGroup = result.Attributes
+      
+      return NextResponse.json({ success: true, group: updatedGroup })
+    }
+
+    if (action === 'leaveGroup') {
+      const { groupId, userId } = data
+      
+      // Get the current group
+      const getCommand = new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { id: groupId }
       })
+      
+      const getResult = await docClient.send(getCommand)
+      const group = getResult.Item
+      
+      if (!group) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Group not found' 
+        }, { status: 404 })
+      }
+      
+      if (!group.members.includes(userId)) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'You are not a member of this group' 
+        }, { status: 400 })
+      }
+      
+      // Remove user from members list and decrement member count
+      const updatedMembers = group.members.filter((member: string) => member !== userId)
+      const newMemberCount = group.memberCount - 1
+      
+      // If no members left, mark group as inactive
+      if (newMemberCount === 0) {
+        const updateCommand = new UpdateCommand({
+          TableName: TABLE_NAME,
+          Key: { id: groupId },
+          UpdateExpression: 'SET isActive = :inactive, memberCount = :zero',
+          ExpressionAttributeValues: {
+            ':inactive': false,
+            ':zero': 0
+          },
+          ReturnValues: 'ALL_NEW'
+        })
+        
+        const result = await docClient.send(updateCommand)
+        return NextResponse.json({ 
+          success: true, 
+          group: result.Attributes,
+          deleted: true
+        })
+      } else {
+        const updateCommand = new UpdateCommand({
+          TableName: TABLE_NAME,
+          Key: { id: groupId },
+          UpdateExpression: 'SET members = :members, memberCount = :memberCount',
+          ExpressionAttributeValues: {
+            ':members': updatedMembers,
+            ':memberCount': newMemberCount
+          },
+          ReturnValues: 'ALL_NEW'
+        })
+        
+        const result = await docClient.send(updateCommand)
+        return NextResponse.json({ 
+          success: true, 
+          group: result.Attributes,
+          deleted: false
+        })
+      }
     }
 
     if (action === 'sendInvite') {
@@ -193,8 +247,7 @@ export async function POST(request: NextRequest) {
       
       const inviteCommand = new PutCommand({
         TableName: INVITES_TABLE_NAME,
-        Item: invite,
-        ConditionExpression: 'attribute_not_exists(id)'
+        Item: invite
       })
       
       await docClient.send(inviteCommand)
@@ -220,8 +273,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, invites: result.Items || [] })
     }
 
+    if (action === 'getAllInvites') {
+      const command = new ScanCommand({
+        TableName: INVITES_TABLE_NAME
+      })
+      
+      const result = await docClient.send(command)
+      return NextResponse.json({ success: true, invites: result.Items || [] })
+    }
+
     if (action === 'respondToInvite') {
-      const { inviteId, userId, response } = data // response: 'accept' or 'decline'
+      const { inviteId, userId, response } = data
       
       // Get the invite
       const getInviteCommand = new GetCommand({
@@ -270,17 +332,16 @@ export async function POST(request: NextRequest) {
           }, { status: 400 })
         }
         
-        // Add user to group
+        // Add user to group - use simple array operations
+        const updatedMembers = [...group.members, userId]
         const updateGroupCommand = new UpdateCommand({
           TableName: TABLE_NAME,
           Key: { id: invite.groupId },
-          UpdateExpression: 'SET members = list_append(members, :userId), memberCount = memberCount + :one',
-          ConditionExpression: 'memberCount < maxMembers',
+          UpdateExpression: 'SET members = :members, memberCount = :memberCount',
           ExpressionAttributeValues: {
-            ':userId': [userId], // Use array for list_append operation
-            ':one': 1
-          },
-          ReturnValues: 'ALL_NEW'
+            ':members': updatedMembers,
+            ':memberCount': group.memberCount + 1
+          }
         })
         
         await docClient.send(updateGroupCommand)
@@ -295,22 +356,34 @@ export async function POST(request: NextRequest) {
           '#status': 'status'
         },
         ExpressionAttributeValues: {
-          ':status': response === 'accept' ? 'accepted' : 'declined',
+          ':status': response,
           ':respondedAt': new Date().toISOString()
         }
       })
       
       await docClient.send(updateInviteCommand)
-      
-      return NextResponse.json({ 
-        success: true, 
-        message: `Invite ${response}ed successfully` 
-      })
+      return NextResponse.json({ success: true, message: `Invite ${response}ed successfully` })
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    if (action === 'deleteInvite') {
+      const { inviteId } = data
+      
+      const command = new DeleteCommand({
+        TableName: INVITES_TABLE_NAME,
+        Key: { id: inviteId }
+      })
+      
+      await docClient.send(command)
+      return NextResponse.json({ success: true })
+    }
+
+    return NextResponse.json({ success: false, error: 'Unknown action' }, { status: 400 })
+
   } catch (error: any) {
     console.error('API Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message || 'Internal server error' 
+    }, { status: 500 })
   }
 }

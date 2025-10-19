@@ -20,9 +20,6 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup, userP
     className: '',
     subject: '',
     maxMembers: 20, // Fixed cap of 20 members
-    meetingFrequency: 'weekly',
-    meetingDay: 'monday',
-    meetingTime: '18:00',
     isPublic: false
   })
   const [loading, setLoading] = useState(false)
@@ -77,16 +74,6 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup, userP
     'Other'
   ]
 
-  const days = [
-    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
-  ]
-
-  const frequencies = [
-    { value: 'daily', label: 'Daily' },
-    { value: 'weekly', label: 'Weekly' },
-    { value: 'biweekly', label: 'Bi-weekly' },
-    { value: 'monthly', label: 'Monthly' }
-  ]
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -97,8 +84,6 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup, userP
       // TODO: Replace with actual AWS DynamoDB integration
       const groupData = {
         ...formData,
-        // For daily meetings, set meetingDay to 'daily'
-        meetingDay: formData.meetingFrequency === 'daily' ? 'daily' : formData.meetingDay,
         id: Date.now().toString(), // Temporary ID
         createdAt: new Date().toISOString(),
         memberCount: 1, // Creator is the first member
@@ -120,9 +105,6 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup, userP
         className: '',
         subject: '',
         maxMembers: 20, // Fixed cap of 20 members
-        meetingFrequency: 'weekly',
-        meetingDay: 'monday',
-        meetingTime: '18:00',
         isPublic: false
       })
     } catch (error: any) {
@@ -137,9 +119,7 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup, userP
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: value,
-      // If frequency is daily, clear the meeting day
-      ...(name === 'meetingFrequency' && value === 'daily' ? { meetingDay: '' } : {})
+      [name]: value
     }))
   }
 
@@ -265,64 +245,6 @@ export default function CreateGroupModal({ isOpen, onClose, onCreateGroup, userP
 
             </div>
 
-            {/* Meeting Schedule */}
-            <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Meeting Schedule</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label htmlFor="meetingFrequency" className="block text-sm font-medium text-gray-700 mb-2">
-                    Frequency
-                  </label>
-                  <select
-                    id="meetingFrequency"
-                    name="meetingFrequency"
-                    value={formData.meetingFrequency}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    {frequencies.map(freq => (
-                      <option key={freq.value} value={freq.value}>{freq.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {formData.meetingFrequency !== 'daily' && (
-                  <div>
-                    <label htmlFor="meetingDay" className="block text-sm font-medium text-gray-700 mb-2">
-                      Day
-                    </label>
-                    <select
-                      id="meetingDay"
-                      name="meetingDay"
-                      value={formData.meetingDay}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      {days.map(day => (
-                        <option key={day} value={day}>
-                          {day.charAt(0).toUpperCase() + day.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div>
-                  <label htmlFor="meetingTime" className="block text-sm font-medium text-gray-700 mb-2">
-                    Time
-                  </label>
-                  <input
-                    type="time"
-                    id="meetingTime"
-                    name="meetingTime"
-                    value={formData.meetingTime}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Group Visibility */}
