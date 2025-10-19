@@ -1,14 +1,14 @@
 // test/test.js
 
 const path = require('path');
-const { make_file } = require('../public/make_file');
+const { make_file } = require('public/make_file');
 const fs = require('fs');
 const os = require('os');
 const yaml = require('js-yaml'); // ✅ install this
 
 // Example JSON input
 const data11 = {
-  "File path": "../AI/results/englishNotes.txt",
+  "File path": "AI/results/englishNotes.txt",
   "Date Created": "10-18-2025",
   "Study Group Name": "English Study",
   "Class Name": "ENGL 101",

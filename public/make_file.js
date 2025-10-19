@@ -2,35 +2,64 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const yaml = require('js-yaml'); // ✅ install this
+const { spawnSync } = require("child_process");
 
+function callPythonHandler(action, parameters, context = null) {
+  // Construct the "event" object
+  const event = {
+    body: JSON.stringify({
+      action,
+      parameters,
+    }),
+  };
 
-const { spawnSync } = require('child_process');
+  const payload = { event, context };
 
-// `body` is a JS object that includes "action" and parameters
-const body = {
-  action: "get_summary",
-  parameters: { notesContent: notes_content }
-};
+  // Serialize to JSON and call handler.py
+  const inputJSON = JSON.stringify(payload);
+  const result = spawnSync("python3", ["handler.py", inputJSON], { encoding: "utf-8" });
 
-// Wrap it in an event object with "body" as JSON string
-const event = {
-  body: JSON.stringify(body)
-};
+  if (result.error) {
+    console.error("Error calling Python:", result.error);
+    return null;
+  }
 
-// Optional: context object
-// const context = { user: "PersonA" };
-
-// Call the Python script
-const inputJSON = JSON.stringify({ event});//, context });
-
-const result = spawnSync('python3', ['handler.py', inputJSON], { encoding: 'utf-8' });
-
-if (result.error) {
-  console.error("Error calling Python:", result.error);
-} else {
   const output = JSON.parse(result.stdout);
-  console.log("Python output:", output);
+  if (output.error) {
+    console.error("Python error:", output.error);
+    return null;
+  }
+
+  return output.result;
 }
+
+// const { spawnSync } = require('child_process');
+
+// // `body` is a JS object that includes "action" and parameters
+// const body = {
+//   action: "get_summary",
+//   parameters: { notesContent: notes_content }
+// };
+
+// // Wrap it in an event object with "body" as JSON string
+// const event = {
+//   body: JSON.stringify(body)
+// };
+
+// // Optional: context object
+// // const context = { user: "PersonA" };
+
+// // Call the Python script
+// const inputJSON = JSON.stringify({ event});//, context });
+
+// const result = spawnSync('python3', ['handler.py', inputJSON], { encoding: 'utf-8' });
+
+// if (result.error) {
+//   console.error("Error calling Python:", result.error);
+// } else {
+//   const output = JSON.parse(result.stdout);
+//   console.log("Python output:", output);
+// }
 
 
 
@@ -252,8 +281,6 @@ function make_file(data) {
   file_path = data["File path"];
   // summary_string = get_summary (file_path);
   
-
-  const { spawnSync } = require('child_process');
   notes_content = fs.readFileSync(file_path).toString();/* TODO: Get this done*/
   // `body` is a JS object that includes "action" and parameters
   const body = {
@@ -267,12 +294,13 @@ function make_file(data) {
   };
 
   // Optional: context object
-  // const context = { user: "PersonA" };
+  const context = { user: "PersonA" };
 
   // Call the Python script
-  const inputJSON = JSON.stringify({ event});//, context });
+  const inputJSON = JSON.stringify({ event, context });
 
-  const result = spawnSync('python3', ['handler.py', inputJSON], { encoding: 'utf-8' });
+  // const result = spawnSync('python3', ['handler.py', inputJSON], { encoding: 'utf-8' });
+  const result = callPythonHandler("getSummary", inputJSON);//{ "File Path": file_path });
 
   if (result.error) {
     console.error("Error calling Python:", result.error);
