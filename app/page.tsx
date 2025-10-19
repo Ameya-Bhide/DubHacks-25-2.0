@@ -1016,7 +1016,7 @@ export default function Home() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {studyGroups.map(group => (
+                    {studyGroups.slice(0, 3).map(group => (
                       <div 
                         key={group.id} 
                         onClick={() => handleStudyGroupClick(group)}
@@ -1072,6 +1072,17 @@ export default function Home() {
                         </div>
                       </div>
                     ))}
+                    
+                    {studyGroups.length > 3 && (
+                      <div className="text-center pt-4">
+                        <button 
+                          onClick={() => setActiveTab('study-group')}
+                          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                        >
+                          View All {studyGroups.length} Groups →
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
