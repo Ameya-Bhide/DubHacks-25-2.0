@@ -33,11 +33,16 @@ function createWindow() {
   // Add retry logic for development server
   const loadApp = async () => {
     try {
+      // For development, wait a bit longer for the server to be ready
+      if (isDev) {
+        console.log('Waiting for Next.js development server to be ready...')
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
       await mainWindow.loadURL(startUrl)
     } catch (error) {
       if (isDev) {
-        console.log('Development server not ready, retrying in 2 seconds...')
-        setTimeout(loadApp, 2000)
+        console.log('Development server not ready, retrying in 3 seconds...')
+        setTimeout(loadApp, 3000)
       } else {
         console.error('Failed to load app:', error)
       }
